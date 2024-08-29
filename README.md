@@ -1,4 +1,4 @@
-# CompilerConstruction
+# Compiler Construction
 [![Compiler Construction](https://github.com/devWizBiz/CompilerConstruction/actions/workflows/python-app.yml/badge.svg)](https://github.com/devWizBiz/CompilerConstruction/actions/workflows/python-app.yml)
 
 Compiler Construction Project for COMP 6210 - Auburn University
