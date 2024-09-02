@@ -8,5 +8,5 @@ def test_main_c_compilation():
     assert result.returncode == 0, f"Compilation failed with error: {result.stderr.decode()}"
     
 def test_python_script_execution():
-    result = subprocess.run(["python3.11", "main.py", "-l", "tests/source_files/testMain.c"], capture_output=True)
+    result = subprocess.run(["python3.11", "main.py", "-L", "tests/source_files/testMain.c"], capture_output=True)
     assert result.returncode == 0, f"Execution failed with error: {result.stderr.decode()}"
