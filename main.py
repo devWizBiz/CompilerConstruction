@@ -1,14 +1,31 @@
 # External Libraries
 import argparse
+
 # Internal Libraries
+import support
 import lexer
 
-def error(msg):
-    RED = '\033[91m'
-    END = '\033[0m'
-    print(f"{RED}ERROR: {msg}{END}")
+"""
+Main function that processes a given C source file and optionally runs a lexer.
 
-""" Main Function: Generates given output based on the given arguments """
+This function sets up an argument parser to handle command-line arguments, reads
+the specified C source file, checks its validity, tokenizes its contents, and writes
+the tokens to an output file. If the lexer flag is provided, it also prints the tokenized
+output in a readable format.
+
+Args:
+    -L, --lexer: Optional; if set, prints the tokens.
+    file: Required; the path to the C source file to be processed.
+
+Returns:
+    None
+
+Raises:
+    FileNotFoundError: If the specified file cannot be found.
+
+Examples:
+    python main.py -L example.c
+"""
 def main():
     
     # Create argument parser object
@@ -21,14 +38,19 @@ def main():
     # Parse the arguments
     args = parser.parse_args()
 
+    try:
+        contents = open(args.file, "r").read()
+    except FileNotFoundError as error:
+        support.error(f"{error}")
+        return None
+
+    if(support.checkExtensions(args.file) == False):
+        support.warning(f"File is not supported. Results may vary\nPATH: {args.file}\n")
+    tokens = lexer.tokenize(contents)
+    support.writeToFile(tokens, "tokens.txt")
+
     # Check if the lexer flag is set
     if args.lexer:
-        try:
-            contents = open(args.file, "r").read()
-            lexObj = lexer.Lexer(contents)
-        except FileNotFoundError:
-            error(f"File not found.\nPATH: {args.file}")
-    else:
-        error(f"Cannot process file without lexer.\nPATH: {args.file}")
-    
+        support.prettyPrintOutput(tokens)
+        
 main()
