@@ -21,11 +21,11 @@ TOKEN_PATTERNS = [
     ('SINGLELINE_COMMENT', r'\/\/.*'),
     ('MULTILINE_COMMENT', r'/\*[\S\s]*\*/'),
     ('WHITESPACE', r'\s+'),
-    ('UNSUPPORTED', r'.')
+    ('UNSUPPORTED', r'.+')
 ]
 
 # Join the token patterns through the OR operator along with it's sub-pattern name
-patterns_combined = '|'.join('(?P<%s>%s)' % pair for pair in TOKEN_PATTERNS)
+PATTERNS_COMBINED = '|'.join('(?P<%s>%s)' % pair for pair in TOKEN_PATTERNS)
 
 
 """
@@ -39,7 +39,8 @@ stored with its type, line number, and column position.
         code (str): The source code to be tokenized.
 
     Returns:
-        dict: A dictionary where each key is a token ID and each value is a dictionary containing the token's details (TOKEN, TYPE, LINE, COL).
+        dict: A dictionary where each key is a token ID and each value is a 
+                dictionary containing the token's details (TOKEN, TYPE, LINE, COL).
 
     Raises:
         None
@@ -56,20 +57,22 @@ stored with its type, line number, and column position.
 def tokenize(code):
     tokens = {}
     tokenID = 0
-    compiledPattern = re.compile(patterns_combined)
+    compiledPattern = re.compile(PATTERNS_COMBINED)
     for match in compiledPattern.finditer(code):
         kind = match.lastgroup
         value = match.group()
+        line = code.count('\n', 0, match.start()) + 1
+        column = match.start() - code.rfind('\n', 0, match.start())
         if kind in ['SINGLELINE_COMMENT', 'MULTILINE_COMMENT', 'WHITESPACE']:  # For now, skip comments and whitespace:
                 continue
         elif kind == 'UNSUPPORTED':
-            support.warning(f"Unsupported token found: {value}")
+            support.warning(f"Unsupported token found at LINE {line} COLUMN {column}: {value}")
             continue
         newToken = {
             "TOKEN": value,
             "TYPE": kind,
-            "LINE": code.count('\n', 0, match.start()) + 1,
-            "COL": match.start() - code.rfind('\n', 0, match.start())
+            "LINE": line,
+            "COL": column
             }
         tokens[tokenID] = newToken
         tokenID += 1
