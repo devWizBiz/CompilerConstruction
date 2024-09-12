@@ -21,12 +21,11 @@ TOKEN_PATTERNS = [
     ('SINGLELINE_COMMENT', r'\/\/.*'),
     ('MULTILINE_COMMENT', r'/\*[\S\s]*\*/'),
     ('WHITESPACE', r'\s+'),
-    ('UNSUPPORTED', r'.+')
+    ('UNSUPPORTED', r'\b.+\b')
 ]
 
 # Join the token patterns through the OR operator along with it's sub-pattern name
 PATTERNS_COMBINED = '|'.join('(?P<%s>%s)' % pair for pair in TOKEN_PATTERNS)
-
 
 """
 Tokenizes the given source code into a structured format.
@@ -34,25 +33,6 @@ Tokenizes the given source code into a structured format.
 This function processes the provided code string and extracts tokens based on predefined patterns. 
 It skips comments and whitespace, and logs a warning for unsupported tokens. Each token is 
 stored with its type, line number, and column position.
-
-    Args:
-        code (str): The source code to be tokenized.
-
-    Returns:
-        dict: A dictionary where each key is a token ID and each value is a 
-                dictionary containing the token's details (TOKEN, TYPE, LINE, COL).
-
-    Raises:
-        None
-
-    Examples:
-        tokenize("int main() {}")
-            {0: {'TOKEN': 'int', 'TYPE': 'KEYWORD', 'LINE': 1, 'COL': 0}, 
-            1: {'TOKEN': 'main', 'TYPE': 'IDENTIFIER', 'LINE': 1, 'COL': 4}, 
-            2: {'TOKEN': '(', 'TYPE': 'PARENTHESIS', 'LINE': 1, 'COL': 8}, 
-            3: {'TOKEN': ')', 'TYPE': 'PARENTHESIS', 'LINE': 1, 'COL': 9}, 
-            4: {'TOKEN': '{', 'TYPE': 'BRACE', 'LINE': 1, 'COL': 10}, 
-            5: {'TOKEN': '}', 'TYPE': 'BRACE', 'LINE': 1, 'COL': 11}}
 """
 def tokenize(code):
     tokens = {}
@@ -66,7 +46,9 @@ def tokenize(code):
         if kind in ['SINGLELINE_COMMENT', 'MULTILINE_COMMENT', 'WHITESPACE']:  # For now, skip comments and whitespace:
                 continue
         elif kind == 'UNSUPPORTED':
-            support.warning(f"Unsupported token found at LINE {line} COLUMN {column}: {value}")
+            # TODO: Look into changing UNSUPPORTED tokens to an error, not sure if it can 
+            # stay as just a warning
+            support.warning(f"Unsupported token found at LINE {line} COLUMN {column}: {value}") 
             continue
         newToken = {
             "TOKEN": value,

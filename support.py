@@ -20,7 +20,13 @@ def writeToFile(input, fileName):
     with open(fileName, 'w') as file:
         pprint.pprint(input, file)
         
-def checkExtensions(fileName):
-    if fileName.endswith('.c'):
+def checkExtensions(filePath):
+    if filePath.endswith('.c'):
         return True
 
+def retrieveFileName(filePath):
+    fileName = filePath.split('\\')[-1].split('.')[0] # Windows Pathing
+    if ( fileName != '' ):
+        return fileName
+    else:
+        return filePath.split('/')[-1].split('.')[0] # Linux Pathing     
