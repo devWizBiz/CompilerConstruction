@@ -18,7 +18,7 @@ def prettyPrintOutput(input):
 
 def writeToFile(input, fileName):
     with open(fileName, 'w') as file:
-        pprint.pprint(input, file)
+        file.write(str(input) + '\n')
         
 def checkExtensions(filePath):
     if filePath.endswith('.c'):

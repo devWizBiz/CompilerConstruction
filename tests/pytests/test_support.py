@@ -22,8 +22,10 @@ def test_prettyPrintOutput():
 
 def test_writeToFile():
     sample_data = {"key": "value"}
-    with mock.patch('builtins.open', mock.mock_open()) as mock_open:
+    with mock.patch('builtins.open', mock.mock_open()) as mock_file:
         support.writeToFile(sample_data, "test_file.txt")
-        mock_open.assert_called_once_with("test_file.txt", 'w')
-        handle = mock_open()
-        handle.write.assert_called_once_with("{" + "key: 'value'" + "}\n")  # Adjust based on actual output format
+        mock_file.assert_called_once_with("test_file.txt", 'w')
+        handle = mock_file()
+
+        # Adjust based on pprint's formatted output
+        handle.write.assert_called_once_with("{'key': 'value'}\n")

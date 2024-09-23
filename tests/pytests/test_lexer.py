@@ -52,7 +52,7 @@ def test_tokenize_valid_content():
 
 def test_tokenize_unsupported_token():
     content_with_unsupported = "int main() { 12TMP }"
-    with mock.patch('support.warning') as mock_warning:
+    with mock.patch('support.error') as mock_warning:
         tokens = lexer.tokenize(content_with_unsupported)
         assert tokens[0] == {"TOKEN": "int", "TYPE": "KEYWORD", "LINE": 1, "COL": 1}
         assert tokens[1] == {"TOKEN": "main", "TYPE": "IDENTIFIER", "LINE": 1, "COL": 5}

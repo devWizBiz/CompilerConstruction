@@ -41,4 +41,5 @@ def main():
     if args.lexer:
         support.prettyPrintOutput(tokens)
         
-main()
+if __name__ == "__main__":
+    main()
