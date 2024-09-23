@@ -1,7 +1,7 @@
 # External Libraries
+from pathlib import Path
 import pprint
 import sys
-
 
 YELLOW = '\033[93m'
 RED = '\033[91m'
@@ -25,8 +25,5 @@ def checkExtensions(filePath):
         return True
 
 def retrieveFileName(filePath):
-    fileName = filePath.split('\\')[-1].split('.')[0] # Windows Pathing
-    if ( fileName != '' ):
-        return fileName
-    else:
-        return filePath.split('/')[-1].split('.')[0] # Linux Pathing     
+    fileName = Path(filePath).stem
+    return fileName

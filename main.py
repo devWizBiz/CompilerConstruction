@@ -19,7 +19,7 @@ def main():
     parser = argparse.ArgumentParser(description='Construction Compiler with various arguments')
 
     # Add Arguments
-    parser.add_argument('-L', '--lexer', action='store_true', help='Run through the lexer')
+    parser.add_argument('-L', '--lexer', action='store_true', help='Print tokenized output')
     parser.add_argument('file', help='Given C source file')
 
     # Parse the arguments

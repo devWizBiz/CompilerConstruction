@@ -46,9 +46,7 @@ def tokenize(code):
         if kind in ['SINGLELINE_COMMENT', 'MULTILINE_COMMENT', 'WHITESPACE']:  # For now, skip comments and whitespace:
                 continue
         elif kind == 'UNSUPPORTED':
-            # TODO: Look into changing UNSUPPORTED tokens to an error, not sure if it can 
-            # stay as just a warning
-            support.warning(f"Unsupported token found at LINE {line} COLUMN {column}: {value}") 
+            support.error(f"Unsupported token found at LINE {line} COLUMN {column}: {value}") 
             continue
         newToken = {
             "TOKEN": value,
