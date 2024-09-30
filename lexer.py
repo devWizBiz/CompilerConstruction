@@ -46,13 +46,13 @@ def tokenize(code):
         if kind in ['SINGLELINE_COMMENT', 'MULTILINE_COMMENT', 'WHITESPACE']:  # For now, skip comments and whitespace:
                 continue
         elif kind == 'UNSUPPORTED':
-            support.error(f"Unsupported token found at LINE {line} COLUMN {column}: {value}") 
+            support.error(f'Unsupported token found at LINE {line} COLUMN {column}: {value}') 
             continue
         newToken = {
-            "TOKEN": value,
-            "TYPE": kind,
-            "LINE": line,
-            "COL": column
+            'TOKEN': value,
+            'TYPE': kind,
+            'LINE': line,
+            'COL': column
             }
         tokens[tokenID] = newToken
         tokenID += 1

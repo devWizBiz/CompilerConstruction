@@ -4,6 +4,7 @@ import argparse
 # Internal Libraries
 import support
 import lexer
+import parser
 
 """
 Main function that processes a given C source file and optionally runs a lexer.
@@ -16,30 +17,39 @@ output in a readable format.
 def main():
     
     # Create argument parser object
-    parser = argparse.ArgumentParser(description='Construction Compiler with various arguments')
+    argParser = argparse.ArgumentParser(description='Construction Compiler with various arguments')
 
     # Add Arguments
-    parser.add_argument('-L', '--lexer', action='store_true', help='Print tokenized output')
-    parser.add_argument('file', help='Given C source file')
+    argParser.add_argument('-L', '--lexer', action='store_true', help='Print tokenized output')
+    argParser.add_argument('-P', '--parse', action='store_true', help='Print AST and Symbol Table')
+    argParser.add_argument('file', help='Given C source file')
 
     # Parse the arguments
-    args = parser.parse_args()
+    args = argParser.parse_args()
 
     try:
         contents = open(args.file, "r").read()
     except FileNotFoundError as error:
         support.error(f"{error}")
         return None
-
     if(support.checkExtensions(args.file) == False):
         support.warning(f"File is not supported. Results may vary\nPATH: {args.file}\n")
+
     tokens = lexer.tokenize(contents)
+    abstractSyntaxTree, symbolTable = parser.parserProgram(tokens)
+
     fileName = support.retrieveFileName(args.file)
     support.writeToFile(tokens, f"tokens_{fileName}.txt")
+    support.writeToFile(abstractSyntaxTree, f"abstractSyntaxTree_{fileName}.txt")
+    support.writeToFile(symbolTable, f"symbolTable_{fileName}.txt")
 
     # Check if the lexer flag is set
     if args.lexer:
-        support.prettyPrintOutput(tokens)
-        
+        support.prettyPrintLex(tokens)
+
+    if args.parse:
+        support.printAST(abstractSyntaxTree)
+        support.printSymbolTable(symbolTable)
+
 if __name__ == "__main__":
     main()
