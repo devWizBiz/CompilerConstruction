@@ -14,12 +14,6 @@
   - **Example**:  
     ```int x;```
 
-- **Array Declaration**:
-  - **Syntax**:  
-    ```int identifier[];```
-    - **Example**:  
-      ```int arr[];```
-
 ## 2. **Variable Assignments**
 
 ### Supported Types:
