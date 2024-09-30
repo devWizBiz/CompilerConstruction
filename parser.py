@@ -96,7 +96,7 @@ def parseStatements(tokenCount, tokens, functionDeclaration, functionIdentifier,
                         consumedToken = tokens[tokenCount]
                         tokenCount += 1
                         
-                        if(consumedToken['TYPE'] in ['STRING_CONSTANT', 'CHAR_CONSTANT']):
+                        if consumedToken['TYPE'] in ['STRING_CONSTANT', 'CHAR_CONSTANT']:
                             statements.append(["ASSIGN", storedIdentifier+"[]", consumedToken['TOKEN']])
                             consumedToken = tokens[tokenCount]
                             tokenCount += 1
