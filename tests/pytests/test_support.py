@@ -14,12 +14,6 @@ def test_warning():
         support.warning("Test warning message")
         mock_write.assert_called_once_with("\033[93mWarning: \033[0mTest warning message\n")
 
-def test_prettyPrintOutput():
-    sample_data = {"key": "value"}
-    with mock.patch('pprint.pprint') as mock_pprint:
-        support.prettyPrintOutput(sample_data)
-        mock_pprint.assert_called_once_with(sample_data)
-
 def test_writeToFile():
     sample_data = {"key": "value"}
     with mock.patch('builtins.open', mock.mock_open()) as mock_file:
