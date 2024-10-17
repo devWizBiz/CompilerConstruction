@@ -145,7 +145,11 @@ def parseExpressions(tokens):
     while peekNextToken(tokens) is not None and peekNextToken(tokens)['TOKEN'] in ['+', '-']:
         opToken = consumeNextToken(tokens)
         term = parseTerm(tokens)
-        expr = [expr, opToken['TOKEN'], term]
+        if isinstance(expr, list):
+            expr.append(opToken['TOKEN'])
+            expr.append(term)
+        else:
+            expr = [expr, opToken['TOKEN'], term]
 
     return expr
 

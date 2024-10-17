@@ -42,6 +42,13 @@ def printAST(input):
         for statement in input['Program'][key]:
             print(f"---- {statement}")
 
+def printTAC(input):
+    print("#########--- Three Address Code ---#########")
+    for key in input:
+        print(f"-- {key}")
+        for statement in input[key]:
+            print(f"---- {statement}")
+
 def writeToFile(input, fileName):
     with open(fileName, 'w') as file:
         file.write(str(input) + '\n')

@@ -5,6 +5,7 @@ import argparse
 import support
 import lexer
 import parser
+import tac
 
 """
 Main function that processes a given C source file and optionally runs a lexer.
@@ -22,6 +23,7 @@ def main():
     # Add Arguments
     argParser.add_argument('-L', '--lexer', action='store_true', help='Print tokenized output')
     argParser.add_argument('-P', '--parse', action='store_true', help='Print AST and Symbol Table')
+    argParser.add_argument('-T', '--tac', action='store_true', help='Print Three Address Code')
     argParser.add_argument('file', help='Given C source file')
 
     # Parse the arguments
@@ -37,11 +39,14 @@ def main():
 
     tokens = lexer.tokenize(contents)
     abstractSyntaxTree, symbolTable = parser.parseProgram(tokens)
+    tacDict = tac.generateTAC(abstractSyntaxTree, symbolTable)
 
     fileName = support.retrieveFileName(args.file)
     support.writeToFile(tokens, f"tokens_{fileName}.txt")
     support.writeToFile(abstractSyntaxTree, f"abstractSyntaxTree_{fileName}.txt")
     support.writeToFile(symbolTable, f"symbolTable_{fileName}.txt")
+    support.writeToFile(tacDict, f"TAC_{fileName}.txt")
+
 
     # Check if the lexer flag is set
     if args.lexer:
@@ -50,6 +55,9 @@ def main():
     if args.parse:
         support.printAST(abstractSyntaxTree)
         support.printSymbolTable(symbolTable)
+
+    if args.tac:
+        support.printTAC(tacDict)
 
 if __name__ == "__main__":
     main()
