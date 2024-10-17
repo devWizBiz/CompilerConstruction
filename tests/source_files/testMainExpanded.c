@@ -1,4 +1,5 @@
 int i;
+int j = 0;
 
 void testStringFunction(){
     char s[] = '2';
@@ -30,7 +31,7 @@ int calculateSumOfInts(){
 int calculateDifferenceOfInts(){
     int a = 10;
     int b = 2;
-    int difference = a - b;
+    int difference = a - b * 2;
     return difference;
 }
 

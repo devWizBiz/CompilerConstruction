@@ -1,263 +1,229 @@
-# External Libraries
-import pdb
-
-# Internal Libraries
-import support
-
+# Global Variables
+TokenCounter = 0
 SymbolTable = {"Global": {}}
-AST = {"Program": {}}
+AST = {"Program": {"Global": []}}
 
-def parserProgram(tokens):
-    parseFunctions(tokens, 0)
+def parseProgram(tokens):
+    parseFunctions(tokens)
     return AST, SymbolTable
 
-def parseFunctions(tokens, tokenCount):
-    consumedToken = tokens[tokenCount]
-    
-    tokenCount += 1  # Increment the counter after reading the token
+def parseFunctions(tokens):
+    while peekNextToken(tokens) is not None:
 
-    if consumedToken['TOKEN'] in ['void', 'char', 'int', 'float']:  # For now, support just 'int'
-        typeDeclaration = consumedToken['TOKEN']
-        consumedToken = tokens[tokenCount]
-        tokenCount += 1
-        
-        if consumedToken['TYPE'] == 'IDENTIFIER':
-            storedIdentifier = consumedToken['TOKEN']
-            consumedToken = tokens[tokenCount]
-            tokenCount += 1
+        typeToken = consumeNextToken(tokens)
+        if typeToken['TOKEN'] in ['int', 'float', 'char', 'void']:
+            identifierToken = consumeNextToken(tokens)
 
-            if consumedToken['TOKEN'] == '(': # args not supported as of now
-                params = None
-                consumedToken = tokens[tokenCount]
-                tokenCount += 1
+            if identifierToken['TYPE'] == 'IDENTIFIER':
+                peekToken = peekNextToken(tokens)
 
-                if consumedToken['TOKEN'] == ')':
-                    consumedToken = tokens[tokenCount]
-                    tokenCount += 1
+                if peekToken is not None and peekToken['TOKEN'] != '(':
+                    parseGlobalDeclaration(tokens, typeToken['TOKEN'], identifierToken['TOKEN'])
+                elif peekToken is not None and peekToken['TOKEN'] == '(':
+                    functionName = identifierToken['TOKEN']
+                    returnType = typeToken['TOKEN']
+                    consumeNextToken(tokens) # Burn '('
+                    consumeNextToken(tokens) # Burn ')'
+                    consumedToken = consumeNextToken(tokens)
 
                     if consumedToken['TOKEN'] == '{':
-                        closingBraceIndex = lookAhead(tokenCount, tokens, '}')  # Look ahead for closing brace
-                        
-                        if closingBraceIndex != -1:
-                            statements = []
-                            SymbolTable['Global'][storedIdentifier] = {'retType':typeDeclaration, "args":params, "vars":{}}
-                            AST['Program'][storedIdentifier] =  statements
-                            parseStatements(tokenCount, tokens, typeDeclaration, storedIdentifier, statements)
-                            if closingBraceIndex < len(tokens) - 1:
-                                return parseFunctions(tokens, closingBraceIndex + 1)  # Continue parsing into more functions after closing brace
-                        else:
-                            support.error('Expected closing "}" but not found.')
+                        addSymbol(functionName, returnType, True)
+                        addASTNode( functionName )
+                        parseStatements(tokens, functionName)
 
-            elif consumedToken['TOKEN'] == ';':  # Global variable declaration
-                SymbolTable['Global'][storedIdentifier] = typeDeclaration
-                return parseFunctions(tokens, tokenCount)  # Continue parsing after declaration # ERROR CHECKING
+                else:
+                    raise SyntaxError(f"Unexpected token after identifier: {peekToken['TOKEN']}")
 
             else:
-                support.error(f'Expected "(" or ";", instead received "{consumedToken["TOKEN"]}"')
+                raise SyntaxError(f"Expected identifier after type, got: {identifierToken['TOKEN']}")
 
         else:
-            support.error(f'Expected an IDENTIFIER, instead received "{consumedToken["TOKEN"]}"')
+            raise SyntaxError(f"Expected type, got: {typeToken['TOKEN']}")
+
+def parseGlobalDeclaration(tokens, varType, varName):
+    consumedToken = peekNextToken(tokens)
+
+    if consumedToken['TOKEN'] == ';':
+        consumeNextToken(tokens) # Burn ';'
+        addSymbol(varName, varType, False)
+
+    elif consumedToken['TOKEN'] == '=':
+        consumeNextToken(tokens) # Burn '='
+        value = parseExpressions(tokens)
+        addSymbol(varName, varType, False)
+
+        modifyNode('Global', 'ASSIGN', varName, value)
+
+        if peekNextToken(tokens)['TOKEN'] == ';':
+            consumeNextToken(tokens) # Burn ';'
 
     else:
-        support.error(f'Expected "void", "char", "int", "float", instead received "{consumedToken["TOKEN"]}"')
+        raise SyntaxError(f"Expected ';' or '=', got: {consumedToken['TOKEN']}")
 
-def parseStatements(tokenCount, tokens, functionDeclaration, functionIdentifier, statements):
-    consumedToken = tokens[tokenCount]
-    tokenCount += 1
-    
-    if consumedToken['TOKEN'] == '}':
-        return statements
-    
-    if consumedToken['TOKEN'] in ['int', 'char', 'float']: # Variable Declaration / Assignment
-        typeDeclaration = consumedToken['TOKEN']
-        consumedToken = tokens[tokenCount]
-        tokenCount += 1
+def parseStatements(tokens, functionName): # SUPPORTS: DECLARATIONS, ASSIGNMENTS, RETURN STATEMENTS
+    while peekNextToken(tokens) is not None and peekNextToken(tokens)['TOKEN'] != '}':
+        consumedToken = peekNextToken(tokens)
         
-        if consumedToken['TYPE'] == 'IDENTIFIER':
-            storedIdentifier = consumedToken['TOKEN']
-            consumedToken = tokens[tokenCount]
-            
-            tokenCount += 1
-            
-            if consumedToken['TOKEN'] == ';':
-                SymbolTable['Global'][functionIdentifier]["vars"].update({storedIdentifier: typeDeclaration})
-                return parseStatements(tokenCount, tokens, functionDeclaration, functionIdentifier, statements)
-            
-            elif consumedToken['TOKEN'] == '[':
-                consumedToken = tokens[tokenCount]
-                tokenCount += 1
-                
-                if consumedToken['TOKEN'] == ']':
-                    SymbolTable['Global'][functionIdentifier]["vars"].update({storedIdentifier+"[]": typeDeclaration})
-                    consumedToken = tokens[tokenCount]
-                    tokenCount += 1
-                    
-                    if consumedToken['TOKEN'] == '=': # Assign
-                        consumedToken = tokens[tokenCount]
-                        tokenCount += 1
-                        
-                        if consumedToken['TYPE'] in ['STRING_CONSTANT', 'CHAR_CONSTANT']:
-                            statements.append(["ASSIGN", storedIdentifier+"[]", consumedToken['TOKEN']])
-                            consumedToken = tokens[tokenCount]
-                            tokenCount += 1
-                        
-                        if consumedToken['TOKEN'] == ';':
-                            return parseStatements(tokenCount, tokens, functionDeclaration, functionIdentifier, statements)
-            
-            elif consumedToken['TOKEN'] == '=':
-                SymbolTable['Global'][functionIdentifier]["vars"].update({storedIdentifier: typeDeclaration})
-                consumedToken = tokens[tokenCount]
-                tokenCount += 1
+        if consumedToken['TOKEN'] in ['int', 'float', 'char']:
+            typeToken = consumeNextToken(tokens)  
+            varType = typeToken['TOKEN']
+            identifierToken = consumeNextToken(tokens) 
+        
+            if identifierToken['TYPE'] != 'IDENTIFIER':
+                raise SyntaxError(f"Expected identifier, got: {identifierToken['TOKEN']}")
+            varName = identifierToken['TOKEN']
+            consumedToken = peekNextToken(tokens)
+        
+            if consumedToken['TOKEN'] == '[':
+                consumeNextToken(tokens) # Burn '['
+                consumedToken = consumeNextToken(tokens)
+                if consumedToken['TOKEN'] != ']':
+                    raise SyntaxError(f"Expected ']', got: {consumedToken['TOKEN']}")
+                varName += '[]'
+            consumedToken = peekNextToken(tokens)
+        
+            if consumedToken['TOKEN'] == '=':
+                consumeNextToken(tokens) # Burn '['
+                value = parseExpressions(tokens)
+                modifyNode( functionName, 'ASSIGN', varName, value)
+            else:
+                pass
 
-                expression = []
-                expression.append(consumedToken['TOKEN'])
-
-                if consumedToken['TYPE'] == 'INTEGER_CONSTANT' and typeDeclaration == 'int':
-                    statements.append(["ASSIGN", storedIdentifier, consumedToken['TOKEN']])
-                    consumedToken = tokens[tokenCount]
-                    tokenCount += 1
-                
-                elif consumedToken['TYPE'] == 'FLOATING_CONSTANT' and typeDeclaration == 'float':
-                    statements.append(["ASSIGN", storedIdentifier, consumedToken['TOKEN']])
-                    consumedToken = tokens[tokenCount]
-                    tokenCount += 1
-                    
-                elif consumedToken['TYPE'] in ['CHAR_CONSTANT', 'STRING_CONSTANT'] and typeDeclaration == 'char':
-                    statements.append(["ASSIGN", storedIdentifier, consumedToken['TOKEN']])
-                    consumedToken = tokens[tokenCount]
-                    tokenCount += 1
-
-                elif consumedToken['TYPE'] == 'IDENTIFIER': # TODO: Check if the identifier is declared
-                    statements.append(["ASSIGN", storedIdentifier, consumedToken['TOKEN']])
-                    consumedToken = tokens[tokenCount]
-                    tokenCount += 1
-            
+            modifySymbol(functionName, varName, varType)
+        
+            if peekNextToken(tokens)['TOKEN'] == ';':
+                consumeNextToken(tokens)
+            else:
+                raise SyntaxError(f"Expected ';', got: {peekNextToken(tokens)['TOKEN']}")
+        
+        elif consumedToken['TOKEN'] == 'return':
+            consumeNextToken(tokens)  # Burn 'return'
+            value = parseExpressions(tokens)
+            modifyNode( functionName, 'RETURN', None, value)
+        
+            if peekNextToken(tokens)['TOKEN'] == ';':
+                consumeNextToken(tokens) # Burn ';'
+        
+            else:
+                raise SyntaxError(f"Expected ';', got: {peekNextToken(tokens)['TOKEN']}")
+        
+        elif consumedToken['TYPE'] == 'IDENTIFIER':
+            identifierToken = consumeNextToken(tokens) 
+            varName = identifierToken['TOKEN']
+            consumedToken = peekNextToken(tokens)
+        
+            if consumedToken['TOKEN'] == '=':
+                consumeNextToken(tokens) # Burn '='
+                value = parseExpressions(tokens)
+                modifyNode( functionName, 'ASSIGN', varName, value)
+        
+                if peekNextToken(tokens)['TOKEN'] == ';':
+                    consumeNextToken(tokens) # Burn ';'
+        
                 else:
-                    support.error(f'Expected "{typeDeclaration}", instead received "{consumedToken["TOKEN"]}"')
-                    
-                if consumedToken['TOKEN'] in ['+', '-', '*', '/'] and typeDeclaration in ['int', 'float']:
-                    expression.append(consumedToken['TOKEN'])
-                    consumedToken = tokens[tokenCount]
-                    tokenCount += 1
-
-                    expression.append(consumedToken['TOKEN'])
-                    statements.append(expression)
-
-                    if consumedToken['TYPE'] == 'INTEGER_CONSTANT' and typeDeclaration == 'int':
-                        consumedToken = tokens[tokenCount]
-                        tokenCount += 1
-
-                    elif consumedToken['TYPE'] == 'FLOATING_CONSTANT' and typeDeclaration == 'float':
-                        consumedToken = tokens[tokenCount]
-                        tokenCount += 1
-
-                    elif consumedToken['TYPE'] == 'IDENTIFIER': # TODO: Check if the identifier is declared
-                        consumedToken = tokens[tokenCount]
-                        tokenCount += 1
-
-                if consumedToken['TOKEN'] == ';':
-                    return parseStatements(tokenCount, tokens, functionDeclaration, functionIdentifier, statements)
-                
-            else:
-                support.error(f'Expected ";" or "=", instead received "{consumedToken["TOKEN"]}"')
-    
-    elif consumedToken['TYPE'] == 'IDENTIFIER': # Assignments
-        storedIdentifier = consumedToken['TOKEN']
-        storedType = SymbolTable['Global'][functionIdentifier]["vars"][storedIdentifier]
-        consumedToken = tokens[tokenCount]
-        tokenCount += 1
-        
-        if consumedToken['TOKEN'] == '=':
-            consumedToken = tokens[tokenCount]
-            tokenCount += 1
-            expression = []
-            expression.append(consumedToken['TOKEN'])
-            
-            if consumedToken['TYPE'] == 'INTEGER_CONSTANT' and storedType == 'int':
-                statements.append(["ASSIGN", storedIdentifier, consumedToken['TOKEN']])
-                consumedToken = tokens[tokenCount]
-                tokenCount += 1
-            
-            elif consumedToken['TYPE'] == 'FLOATING_CONSTANT' and storedType == 'float':
-                statements.append(["ASSIGN", storedIdentifier, consumedToken['TOKEN']])
-                consumedToken = tokens[tokenCount]
-                tokenCount += 1
-                
-            elif consumedToken['TYPE'] in ['CHAR_CONSTANT', 'STRING_CONSTANT'] and storedType == 'char':
-                statements.append(["ASSIGN", storedIdentifier, consumedToken['TOKEN']])
-                consumedToken = tokens[tokenCount]
-                tokenCount += 1
-
-            elif consumedToken['TYPE'] == 'IDENTIFIER' and storedType == SymbolTable['Global'][functionIdentifier]["vars"][consumedToken['TOKEN']]: 
-                statements.append(["ASSIGN", storedIdentifier, consumedToken['TOKEN']])
-                consumedToken = tokens[tokenCount]
-                tokenCount += 1
+                    raise SyntaxError(f"Expected ';', got: {peekNextToken(tokens)['TOKEN']}")
         
             else:
-                support.error(f'Expected "{storedType}", instead received "{consumedToken["TOKEN"]}"')            
-
-            if consumedToken['TOKEN'] in ['+', '-', '*', '/'] and storedType in ['int', 'float']:
-                expression.append(consumedToken['TOKEN'])
-                consumedToken = tokens[tokenCount]
-                tokenCount += 1
-
-                expression.append(consumedToken['TOKEN'])
-                statements.append(expression)
-                
-                if consumedToken['TYPE'] == 'INTEGER_CONSTANT' and storedType == 'int':
-                    consumedToken = tokens[tokenCount]
-                    tokenCount += 1
-
-                elif consumedToken['TYPE'] == 'FLOATING_CONSTANT' and storedType == 'float':
-                    consumedToken = tokens[tokenCount]
-                    tokenCount += 1
-
-                elif consumedToken['TYPE'] == 'IDENTIFIER' and storedType == SymbolTable['Global'][functionIdentifier]["vars"][consumedToken['TOKEN']]: 
-                    consumedToken = tokens[tokenCount]
-                    tokenCount += 1
-
-                
-            if consumedToken['TOKEN'] == ';':
-                return parseStatements(tokenCount, tokens, functionDeclaration, functionIdentifier, statements)
-            
-        elif consumedToken['TOKEN'] == ';':  
-            return parseStatements(tokenCount, tokens, functionDeclaration, functionIdentifier, statements)
+                consumeNextToken(tokens) # Burn ';'
         
         else:
-            support.error(f'Expected "=", instead received "{consumedToken["TOKEN"]}"')
+            consumeNextToken(tokens) # Burn token
     
-    elif consumedToken['TOKEN'] == 'return': # Returns
-        consumedToken = tokens[tokenCount]
-        tokenCount += 1
+    if peekNextToken(tokens) is not None and peekNextToken(tokens)['TOKEN'] == '}':
+        consumeNextToken(tokens) # Burn '}'
+    
+    else:
+        raise SyntaxError(f"Expected closing braces, got: {peekNextToken(tokens)['TOKEN']}")
 
-        if consumedToken['TYPE'] == 'INTEGER_CONSTANT' and functionDeclaration == 'int':
-            statements.append(["RETURN", consumedToken['TOKEN']])
-            
-        elif consumedToken['TYPE'] == 'FLOATING_CONSTANT' and functionDeclaration == 'float':
-            statements.append(["RETURN", consumedToken['TOKEN']])
-            
-        elif consumedToken['TYPE'] in ['CHAR_CONSTANT', 'STRING_CONSTANT'] and functionDeclaration == 'char':
-            statements.append(["RETURN", consumedToken['TOKEN']])
-            
-        elif consumedToken['TYPE'] == 'IDENTIFIER': # TODO: Check if the identifier is declared and right type
-            statements.append(["RETURN", consumedToken['TOKEN']])
+# Expr -> Term | Expr + Term | Expr - Term
+def parseExpressions(tokens):
 
+    # Term
+    expr = parseTerm(tokens)
+
+    # Expr + Term | Expr - Term
+    while peekNextToken(tokens) is not None and peekNextToken(tokens)['TOKEN'] in ['+', '-']:
+        opToken = consumeNextToken(tokens)
+        term = parseTerm(tokens)
+        expr = [expr, opToken['TOKEN'], term]
+
+    return expr
+
+# Term -> Value | Term * Value | Term / Value
+def parseTerm(tokens):
+
+    # Value
+    term = parseValue(tokens)
+
+    # Term * Value | Term / Value
+    while peekNextToken(tokens) is not None and peekNextToken(tokens)['TOKEN'] in ['*', '/']:
+        opToken = consumeNextToken(tokens)
+        value = parseValue(tokens)
+        term = [term, opToken['TOKEN'], value]
+
+    return term
+
+# Val -> (Expr) | Constant | ID | - Val
+def parseValue(tokens):
+    consumedToken = consumeNextToken(tokens)
+
+    # (Expr)
+    if consumedToken['TOKEN'] == '(':
+        expr = parseExpressions(tokens)
+        if peekNextToken(tokens)['TOKEN'] == ')':
+            consumeNextToken(tokens)
+            return expr
         else:
-            support.error(f'Expected "{functionDeclaration}", instead received "{consumedToken["TOKEN"]}"')
+            raise SyntaxError(f"Expected ')', got: {peekNextToken(tokens)['TOKEN']}")
 
-        consumedToken = tokens[tokenCount]
-        tokenCount += 1
+    # Constant
+    elif consumedToken['TYPE'] in ['INTEGER_CONSTANT', 'FLOATING_CONSTANT', 'STRING_CONSTANT', 'CHAR_CONSTANT']:
+        return consumedToken['TOKEN']
+
+    # ID
+    elif consumedToken['TYPE'] == 'IDENTIFIER':
+        return consumedToken['TOKEN']
+
+    # - Value
+    elif consumedToken['TOKEN'] == '-':
+        value = parseValue(tokens)
+        return ['-', value]
+
+    else:
+        raise SyntaxError(f"Unexpected token: {consumedToken['TOKEN']}")
+
+def consumeNextToken(tokens):
+    global TokenCounter
+    
+    if TokenCounter in tokens:
+        consumedToken = tokens[TokenCounter]
+        TokenCounter += 1
+        return consumedToken
+    
+    else:
+        return None
+
+def peekNextToken(tokens):
+    if TokenCounter in tokens:
+        return tokens[TokenCounter]
+    else:
+        return None
+
+def addSymbol(storedIdentifier, typeDeclaration, isFunc, params=None, variables=None):
+    if not isFunc:
+        SymbolTable['Global'][storedIdentifier] = typeDeclaration
+    else:
+        SymbolTable['Global'][storedIdentifier] = {'retType': typeDeclaration, "args": params, "vars": {}}
+
+def modifySymbol( functionName, varName, varType):
+    SymbolTable['Global'][functionName]['vars'][varName] = varType
+
         
-        if consumedToken['TOKEN'] == ';':
-            closingBraceIndex = lookAhead(tokenCount, tokens, '}')  # Look ahead for closing brace
-            if closingBraceIndex == tokenCount:
-                return statements
-            else:
-                return parseStatements(tokenCount, tokens, functionDeclaration, statements)
-        
-def lookAhead(tokenCount, tokens, searchToken):
-    while tokenCount < len(tokens):
-        if tokens[tokenCount]['TOKEN'] == searchToken:
-            return tokenCount  # Return index of the closing brace
-        tokenCount += 1
-    return -1  # Return -1 if closing brace == not found
+def addASTNode( functionName ):
+    AST['Program'][functionName] = []
+    
+def modifyNode( functionName, TYPE, varName, value):
+    if TYPE == 'RETURN':
+        AST['Program'][functionName].append([TYPE, value])
+    else:
+        AST['Program'][functionName].append([TYPE, varName, value])

@@ -36,7 +36,7 @@ def main():
         support.warning(f"File is not supported. Results may vary\nPATH: {args.file}\n")
 
     tokens = lexer.tokenize(contents)
-    abstractSyntaxTree, symbolTable = parser.parserProgram(tokens)
+    abstractSyntaxTree, symbolTable = parser.parseProgram(tokens)
 
     fileName = support.retrieveFileName(args.file)
     support.writeToFile(tokens, f"tokens_{fileName}.txt")
