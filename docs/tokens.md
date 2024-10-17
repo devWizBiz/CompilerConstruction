@@ -1,4 +1,4 @@
-# Supported Grammar
+# Supported Tokens from Lexer
 
 This document outlines the supported grammar for tokenization.
 
