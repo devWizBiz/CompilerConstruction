@@ -36,12 +36,15 @@ def printSymbolTable(input):
 
 def printAST(input):
     print("#########--- Abstract Syntax Tree ---#########")
-    print("Program")
-    for key in input['Program']:
+    input = input['Program']
+    for key in input:
         print(f"-- {key}")
-        for statement in input['Program'][key]:
-            print(f"---- {statement}")
-
+        if type(input[key]) == dict:
+            for statement in input[key]:
+                print(f"---- {statement} : {input[key][statement]}")
+        else:
+            print(f"---- {input[key]}")
+            
 def printTAC(input):
     print("#########--- Three Address Code ---#########")
     for key in input:

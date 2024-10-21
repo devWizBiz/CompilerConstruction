@@ -1,233 +1,164 @@
-# Global Variables
-TokenCounter = 0
-SymbolTable = {"Global": {}}
-AST = {"Program": {"Global": []}}
+import pdb
 
-def parseProgram(tokens):
-    parseFunctions(tokens)
-    return AST, SymbolTable
+class TreeNode:
+    def __init__(self, value, left=None, right=None):
+        self.value = value
+        self.left = left
+        self.right = right
 
-def parseFunctions(tokens):
-    while peekNextToken(tokens) is not None:
+    def __str__(self):
+        return str(self.value)
 
-        typeToken = consumeNextToken(tokens)
-        if typeToken['TOKEN'] in ['int', 'float', 'char', 'void']:
-            identifierToken = consumeNextToken(tokens)
+# Testing node structure
+def dfs(node):
+    if node is None:
+        return
+    print(node.value)
+    dfs(node.left)
+    dfs(node.right)
 
-            if identifierToken['TYPE'] == 'IDENTIFIER':
-                peekToken = peekNextToken(tokens)
-
-                if peekToken is not None and peekToken['TOKEN'] != '(':
-                    parseGlobalDeclaration(tokens, typeToken['TOKEN'], identifierToken['TOKEN'])
-                elif peekToken is not None and peekToken['TOKEN'] == '(':
-                    functionName = identifierToken['TOKEN']
-                    returnType = typeToken['TOKEN']
-                    consumeNextToken(tokens) # Burn '('
-                    consumeNextToken(tokens) # Burn ')'
-                    consumedToken = consumeNextToken(tokens)
-
-                    if consumedToken['TOKEN'] == '{':
-                        addSymbol(functionName, returnType, True)
-                        addASTNode( functionName )
-                        parseStatements(tokens, functionName)
-
-                else:
-                    raise SyntaxError(f"Unexpected token after identifier: {peekToken['TOKEN']}")
-
+class Parser:
+    def __init__(self, tokens):
+        self.tokens = tokens
+        self.currentTokenIndex = 0
+        
+    def getCurrentToken(self):
+        currentToken = self.tokens.get(self.currentTokenIndex)
+        self.incrementIndex()
+        return currentToken
+    
+    def peekNextToken(self):
+        return self.tokens.get(self.currentTokenIndex)
+    
+    def incrementIndex(self):
+        self.currentTokenIndex += 1
+    
+    def parseProgram(self):
+        f = {}
+        while self.peekNextToken() is not None:
+            info = self.parseFunction()
+            if info is not None:
+                f.update(info)
             else:
-                raise SyntaxError(f"Expected identifier after type, got: {identifierToken['TOKEN']}")
+                info = self.parseGlobalVariable()
+                f.update(info)
+        return {"Program": f}
 
-        else:
-            raise SyntaxError(f"Expected type, got: {typeToken['TOKEN']}")
-
-def parseGlobalDeclaration(tokens, varType, varName):
-    consumedToken = peekNextToken(tokens)
-
-    if consumedToken['TOKEN'] == ';':
-        consumeNextToken(tokens) # Burn ';'
-        addSymbol(varName, varType, False)
-
-    elif consumedToken['TOKEN'] == '=':
-        consumeNextToken(tokens) # Burn '='
-        value = parseExpressions(tokens)
-        addSymbol(varName, varType, False)
-
-        modifyNode('Global', 'ASSIGN', varName, value)
-
-        if peekNextToken(tokens)['TOKEN'] == ';':
-            consumeNextToken(tokens) # Burn ';'
-
-    else:
-        raise SyntaxError(f"Expected ';' or '=', got: {consumedToken['TOKEN']}")
-
-def parseStatements(tokens, functionName): # SUPPORTS: DECLARATIONS, ASSIGNMENTS, RETURN STATEMENTS
-    while peekNextToken(tokens) is not None and peekNextToken(tokens)['TOKEN'] != '}':
-        consumedToken = peekNextToken(tokens)
+    # ['int' | 'char' | 'float'] IDENTIFIER ;
+    def parseGlobalVariable(self):
+        typeToken = self.getCurrentToken()
+        idToken = self.getCurrentToken()
+        if typeToken['TOKEN'] in ['int', 'char', 'float'] and idToken['TYPE'] == 'IDENTIFIER':
+            if self.peekNextToken()['TOKEN'] == ';':
+                self.getCurrentToken()
+                return {idToken['TOKEN']: typeToken['TOKEN']}
         
-        if consumedToken['TOKEN'] in ['int', 'float', 'char']:
-            typeToken = consumeNextToken(tokens)  
-            varType = typeToken['TOKEN']
-            identifierToken = consumeNextToken(tokens) 
+        self.currentTokenIndex -= 2
+        return None
+    
+    # ['void' | 'int' | 'char' | 'float'] IDENTIFIER () { [statements] }
+    def parseFunction(self):
+        currentIndex = self.currentTokenIndex
+        typeToken = self.getCurrentToken()
+        idToken = self.getCurrentToken()
+        allTokens = [self.getCurrentToken() for _ in range(3)]
         
-            if identifierToken['TYPE'] != 'IDENTIFIER':
-                raise SyntaxError(f"Expected identifier, got: {identifierToken['TOKEN']}")
-            varName = identifierToken['TOKEN']
-            consumedToken = peekNextToken(tokens)
+        # Check for function grammar
+        if (typeToken['TOKEN'] in ['void', 'int', 'char', 'float'] and
+            [token['TOKEN'] for token in allTokens] == ['(', ')', '{'] and
+            idToken['TYPE'] == 'IDENTIFIER'):
+                function = {idToken['TOKEN']: {'retType': typeToken['TOKEN'], 'statements': []}}
+                
+                # Parse the function body until the closing brace is encountered
+                function[idToken['TOKEN']]['statements'] = []
+                while self.peekNextToken() and self.peekNextToken()['TOKEN'] != '}':
+                    statement = self.parseStatement()
+                    if statement is not None:
+                        function[idToken['TOKEN']]['statements'].append(statement)
+                
+                # Consume the closing brace
+                if self.peekNextToken() and self.getCurrentToken()['TOKEN'] == '}':
+                    return function
         
-            if consumedToken['TOKEN'] == '[':
-                consumeNextToken(tokens) # Burn '['
-                consumedToken = consumeNextToken(tokens)
-                if consumedToken['TOKEN'] != ']':
-                    raise SyntaxError(f"Expected ']', got: {consumedToken['TOKEN']}")
-                varName += '[]'
-            consumedToken = peekNextToken(tokens)
+        # If parsing fails, reset the index to reattempt
+        self.currentTokenIndex = currentIndex
+        return None
+
+    # 'return' <expression> | 'assignment' <expression> | 'declaration' <expression> #TODO: Implement declaration parsing
+    def parseStatement(self):
+        currentIndex = self.currentTokenIndex
+        statementToken = self.getCurrentToken()
         
-            if consumedToken['TOKEN'] == '=':
-                consumeNextToken(tokens) # Burn '['
-                value = parseExpressions(tokens)
-                modifyNode( functionName, 'ASSIGN', varName, value)
+        # 'return' <expression>
+        if statementToken['TOKEN'] == 'return':
+            expression = self.parseExpression()
+            if expression is not None and self.peekNextToken()['TOKEN'] == ';':
+                self.getCurrentToken()
+                return ['return', expression]
             else:
-                pass
+                self.currentTokenIndex = currentIndex
+                return None
+            
+        # 'assignment' <expression>    
+        if statementToken['TYPE'] == 'IDENTIFIER':
+            if self.peekNextToken()['TOKEN'] == '=':
+                consumedToken = self.getCurrentToken()
+                expression = self.parseExpression()
+                if expression is not None and self.peekNextToken()['TOKEN'] == ';':
+                    self.getCurrentToken()
+                    return ['assignment', TreeNode(statementToken['TOKEN'], expression)]
+            else:
+                self.currentTokenIndex = currentIndex
+                return None
 
-            modifySymbol(functionName, varName, varType)
+        # If we hit this point, the statement is not valid, reset the token index
+        self.currentTokenIndex = currentIndex
+        return None
+    
+    # Expr -> Term | Expr + Term | Expr - Term
+    def parseExpression(self):
+        expression = self.parseTerm()
+
+        while self.peekNextToken()['TOKEN'] in ['+', '-']:
+            opToken = self.getCurrentToken()
+            term = self.parseTerm()
+            expression = TreeNode(opToken['TOKEN'], expression, term)
         
-            if peekNextToken(tokens)['TOKEN'] == ';':
-                consumeNextToken(tokens)
-            else:
-                raise SyntaxError(f"Expected ';', got: {peekNextToken(tokens)['TOKEN']}")
+        return expression
         
-        elif consumedToken['TOKEN'] == 'return':
-            consumeNextToken(tokens)  # Burn 'return'
-            value = parseExpressions(tokens)
-            modifyNode( functionName, 'RETURN', None, value)
+    # Term -> Value | Term * Value | Term / Value
+    def parseTerm(self):
+        term = self.parseValue()
         
-            if peekNextToken(tokens)['TOKEN'] == ';':
-                consumeNextToken(tokens) # Burn ';'
+        while self.peekNextToken()['TOKEN'] in ['*', '/']:
+            opToken = self.getCurrentToken()
+            value = self.parseValue()
+            term = TreeNode(opToken['TOKEN'], term, value)
         
-            else:
-                raise SyntaxError(f"Expected ';', got: {peekNextToken(tokens)['TOKEN']}")
-        
+        return term
+
+    # Val -> (Expr) | INT | ID | - Val
+    def parseValue(self):
+        consumedToken = self.getCurrentToken()
+
+        # (Expr)
+        if consumedToken['TOKEN'] == '(':
+            value = self.parseExpression()
+            if self.peekNextToken()['TOKEN'] == ')':
+                self.getCurrentToken()
+                return value
+
+        # Int
+        elif consumedToken['TYPE'] in ['INTEGER_CONSTANT']:
+            return TreeNode(consumedToken['TOKEN'])
+
+        # ID
         elif consumedToken['TYPE'] == 'IDENTIFIER':
-            identifierToken = consumeNextToken(tokens) 
-            varName = identifierToken['TOKEN']
-            consumedToken = peekNextToken(tokens)
+            return TreeNode(consumedToken['TOKEN'])
+
+        # - Value
+        elif consumedToken['TOKEN'] == '-':
+            value = self.parseValue()
+            return TreeNode('-', None, value)
         
-            if consumedToken['TOKEN'] == '=':
-                consumeNextToken(tokens) # Burn '='
-                value = parseExpressions(tokens)
-                modifyNode( functionName, 'ASSIGN', varName, value)
-        
-                if peekNextToken(tokens)['TOKEN'] == ';':
-                    consumeNextToken(tokens) # Burn ';'
-        
-                else:
-                    raise SyntaxError(f"Expected ';', got: {peekNextToken(tokens)['TOKEN']}")
-        
-            else:
-                consumeNextToken(tokens) # Burn ';'
-        
-        else:
-            consumeNextToken(tokens) # Burn token
-    
-    if peekNextToken(tokens) is not None and peekNextToken(tokens)['TOKEN'] == '}':
-        consumeNextToken(tokens) # Burn '}'
-    
-    else:
-        raise SyntaxError(f"Expected closing braces, got: {peekNextToken(tokens)['TOKEN']}")
-
-# Expr -> Term | Expr + Term | Expr - Term
-def parseExpressions(tokens):
-
-    # Term
-    expr = parseTerm(tokens)
-
-    # Expr + Term | Expr - Term
-    while peekNextToken(tokens) is not None and peekNextToken(tokens)['TOKEN'] in ['+', '-']:
-        opToken = consumeNextToken(tokens)
-        term = parseTerm(tokens)
-        if isinstance(expr, list):
-            expr.append(opToken['TOKEN'])
-            expr.append(term)
-        else:
-            expr = [expr, opToken['TOKEN'], term]
-
-    return expr
-
-# Term -> Value | Term * Value | Term / Value
-def parseTerm(tokens):
-
-    # Value
-    term = parseValue(tokens)
-
-    # Term * Value | Term / Value
-    while peekNextToken(tokens) is not None and peekNextToken(tokens)['TOKEN'] in ['*', '/']:
-        opToken = consumeNextToken(tokens)
-        value = parseValue(tokens)
-        term = [term, opToken['TOKEN'], value]
-
-    return term
-
-# Val -> (Expr) | Constant | ID | - Val
-def parseValue(tokens):
-    consumedToken = consumeNextToken(tokens)
-
-    # (Expr)
-    if consumedToken['TOKEN'] == '(':
-        expr = parseExpressions(tokens)
-        if peekNextToken(tokens)['TOKEN'] == ')':
-            consumeNextToken(tokens)
-            return expr
-        else:
-            raise SyntaxError(f"Expected ')', got: {peekNextToken(tokens)['TOKEN']}")
-
-    # Constant
-    elif consumedToken['TYPE'] in ['INTEGER_CONSTANT', 'FLOATING_CONSTANT', 'STRING_CONSTANT', 'CHAR_CONSTANT']:
-        return consumedToken['TOKEN']
-
-    # ID
-    elif consumedToken['TYPE'] == 'IDENTIFIER':
-        return consumedToken['TOKEN']
-
-    # - Value
-    elif consumedToken['TOKEN'] == '-':
-        value = parseValue(tokens)
-        return ['-', value]
-
-    else:
-        raise SyntaxError(f"Unexpected token: {consumedToken['TOKEN']}")
-
-def consumeNextToken(tokens):
-    global TokenCounter
-    
-    if TokenCounter in tokens:
-        consumedToken = tokens[TokenCounter]
-        TokenCounter += 1
-        return consumedToken
-    
-    else:
         return None
-
-def peekNextToken(tokens):
-    if TokenCounter in tokens:
-        return tokens[TokenCounter]
-    else:
-        return None
-
-def addSymbol(storedIdentifier, typeDeclaration, isFunc, params=None, variables=None):
-    if not isFunc:
-        SymbolTable['Global'][storedIdentifier] = typeDeclaration
-    else:
-        SymbolTable['Global'][storedIdentifier] = {'retType': typeDeclaration, "args": params, "vars": {}}
-
-def modifySymbol( functionName, varName, varType):
-    SymbolTable['Global'][functionName]['vars'][varName] = varType
-
-        
-def addASTNode( functionName ):
-    AST['Program'][functionName] = []
-    
-def modifyNode( functionName, TYPE, varName, value):
-    if TYPE == 'RETURN':
-        AST['Program'][functionName].append([TYPE, value])
-    else:
-        AST['Program'][functionName].append([TYPE, varName, value])
