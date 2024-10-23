@@ -19,20 +19,20 @@ def prettyPrintLex(input):
 
 def printSymbolTable(input):
     print("#########--- Symbol Table ---#########")
-    print("Global")
-    for key in input['Global']:
+    print("Global(s)")
+    for key in input['Global(s)']:
         try:
-            returnType = input['Global'][key]['retType']
-            args = input['Global'][key]['args']
+            returnType = input['Global(s)'][key]['retType']
+            args = input['Global(s)'][key]['args']
             print(f"-- {key}")
             print(f"---- returnType : {returnType}")
             print(f"---- Arguments : {args}")
             print(f"---- Variables:")
-            for var in input['Global'][key]['vars']:
-                theVar = input['Global'][key]['vars'][var]
+            for var in input['Global(s)'][key]['vars']:
+                theVar = input['Global(s)'][key]['vars'][var]
                 print(f"------ {var} : {theVar}")
         except:
-            print(f"-- {key} : {input['Global'][key]}")
+            print(f"-- {key} : {input['Global(s)'][key]}")
 
 def printAST(input):
     print("#########--- Abstract Syntax Tree ---#########")

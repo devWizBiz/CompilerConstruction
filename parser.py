@@ -1,4 +1,17 @@
 import pdb
+import re
+
+PARSER_PATTERNS = [
+    ('FUNCTION_DECLARATION', r'(void|int|float|char)IDENTIFIER\(\)\{'),
+    ('VARIABLE_DECLARATION', r'(int|float|char)IDENTIFIER;'),
+    ('VARIABLE_DECLARATION_ASSIGNMENT', r'(int|float|char)IDENTIFIER='),
+    ('VARIABLE_ASSIGNMENT', r'IDENTIFIER='),
+    ('RETURN', r'return'),
+]
+
+# Join the token patterns through the OR operator along with it's sub-pattern name
+PATTERNS_COMBINED = '|'.join('(?P<%s>%s)' % pair for pair in PARSER_PATTERNS)
+COMPILED_PATTERNS = re.compile(PATTERNS_COMBINED)
 
 class TreeNode:
     def __init__(self, value, left=None, right=None):
@@ -11,17 +24,34 @@ class TreeNode:
 
 # Testing node structure
 def dfs(node):
-    if node is None:
-        return
-    print(node.value)
-    dfs(node.left)
-    dfs(node.right)
+    result = []
+    
+    def helper(current_node):
+        if current_node is None:
+            return
+        
+        # Visit the current node (pre-order traversal)
+        result.append(current_node.value)
+        
+        # Traverse the left and right subtrees
+        helper(current_node.left)
+        helper(current_node.right)
+    
+    # Start the helper function
+    helper(node)
+    
+    return result
 
 class Parser:
     def __init__(self, tokens):
         self.tokens = tokens
         self.currentTokenIndex = 0
-        
+
+        self.abstractSyntaxTree = {}
+
+        self.symbolTable = {}
+        self.symbolTable['Global(s)'] = {}
+                
     def getCurrentToken(self):
         currentToken = self.tokens.get(self.currentTokenIndex)
         self.incrementIndex()
@@ -33,88 +63,199 @@ class Parser:
     def incrementIndex(self):
         self.currentTokenIndex += 1
     
+    def isMatch(self, totalTokens):
+        checkForMatch = ""
+        for token in totalTokens:
+            if token['TYPE'] in ['KEYWORD', 'PUNCTUATORS']:
+                checkForMatch += token['TOKEN']
+            else:
+                checkForMatch += token['TYPE']
+                
+        # Look for match
+        match = COMPILED_PATTERNS.search(checkForMatch)
+
+        return match
+
+    def createSymbolTable(self):
+        for key in self.abstractSyntaxTree:
+            updatedStatements = []
+            
+            if isinstance(self.abstractSyntaxTree[key], str):
+                self.symbolTable['Global(s)'].update({key : self.abstractSyntaxTree[key]})
+            else:
+                self.symbolTable['Global(s)'][key] = {'retType': self.abstractSyntaxTree[key]['retType'], 'args': None, 'vars': {} }
+                
+                for element in self.abstractSyntaxTree[key]['statements']:
+                
+                    if isinstance(element, list) and len(element) == 3:
+                        self.symbolTable['Global(s)'][key]['vars'].update(element[0])
+                        updatedStatements.append(element[1:])
+                    elif isinstance(element, dict):
+                        self.symbolTable['Global(s)'][key]['vars'].update(element)
+                    else:
+                        updatedStatements.append(element)
+                
+                self.abstractSyntaxTree[key]['statements'] = updatedStatements
+        
+    def formatAbstractSyntaxTree(self):
+        for key in self.abstractSyntaxTree:
+            updatedStatements = []
+            
+            if isinstance(self.abstractSyntaxTree[key], dict):
+            
+                for statement in self.abstractSyntaxTree[key]['statements']:
+                    updatedStatements.append([statement[0], dfs(statement[1])])
+                self.abstractSyntaxTree[key]['statements'] = updatedStatements
+
     def parseProgram(self):
-        f = {}
         while self.peekNextToken() is not None:
+            
             info = self.parseFunction()
             if info is not None:
-                f.update(info)
-            else:
-                info = self.parseGlobalVariable()
-                f.update(info)
-        return {"Program": f}
+                self.abstractSyntaxTree.update(info)
+                continue
 
-    # ['int' | 'char' | 'float'] IDENTIFIER ;
-    def parseGlobalVariable(self):
-        typeToken = self.getCurrentToken()
-        idToken = self.getCurrentToken()
-        if typeToken['TOKEN'] in ['int', 'char', 'float'] and idToken['TYPE'] == 'IDENTIFIER':
-            if self.peekNextToken()['TOKEN'] == ';':
-                self.getCurrentToken()
-                return {idToken['TOKEN']: typeToken['TOKEN']}
-        
-        self.currentTokenIndex -= 2
-        return None
-    
+            info = self.parseDeclaration()
+            if info is not None:
+                self.abstractSyntaxTree.update(info)
+            else:
+                raise SyntaxError("No valid tokens to use")
+                    
+        self.createSymbolTable()
+        self.formatAbstractSyntaxTree()
+        self.abstractSyntaxTree = {"Program": self.abstractSyntaxTree}
+
+
     # ['void' | 'int' | 'char' | 'float'] IDENTIFIER () { [statements] }
     def parseFunction(self):
+        # Save index if not global variable
         currentIndex = self.currentTokenIndex
-        typeToken = self.getCurrentToken()
-        idToken = self.getCurrentToken()
-        allTokens = [self.getCurrentToken() for _ in range(3)]
         
-        # Check for function grammar
-        if (typeToken['TOKEN'] in ['void', 'int', 'char', 'float'] and
-            [token['TOKEN'] for token in allTokens] == ['(', ')', '{'] and
-            idToken['TYPE'] == 'IDENTIFIER'):
-                function = {idToken['TOKEN']: {'retType': typeToken['TOKEN'], 'statements': []}}
-                
-                # Parse the function body until the closing brace is encountered
-                function[idToken['TOKEN']]['statements'] = []
-                while self.peekNextToken() and self.peekNextToken()['TOKEN'] != '}':
-                    statement = self.parseStatement()
-                    if statement is not None:
-                        function[idToken['TOKEN']]['statements'].append(statement)
-                
-                # Consume the closing brace
-                if self.peekNextToken() and self.getCurrentToken()['TOKEN'] == '}':
-                    return function
-        
-        # If parsing fails, reset the index to reattempt
-        self.currentTokenIndex = currentIndex
-        return None
+        # Get five tokens for check
+        fiveTokens = [self.getCurrentToken() for _ in range(5)]
 
-    # 'return' <expression> | 'assignment' <expression> | 'declaration' <expression> #TODO: Implement declaration parsing
+        match = self.isMatch(fiveTokens)        
+        
+        if match is None:
+            self.currentTokenIndex = currentIndex
+            return None
+
+        # Match found, begin looking for statement(s)
+        listOfStatements = []
+        while self.peekNextToken() and self.peekNextToken()['TOKEN'] != '}':
+            statement = self.parseStatement()
+            if statement is not None:
+                listOfStatements.append(statement)
+            else:
+                self.currentTokenIndex = currentIndex
+                return None
+        else: # Function done, create function dictionary and return
+            self.getCurrentToken() # Consume '}'
+            completedFunction = {fiveTokens[1]['TOKEN']: {'retType': fiveTokens[0]['TOKEN'], 'statements': listOfStatements}}
+            return completedFunction
+
+    # 'return' <expression> | 'assignment' <expression> | 'declaration' <expression>
     def parseStatement(self):
-        currentIndex = self.currentTokenIndex
-        statementToken = self.getCurrentToken()
         
-        # 'return' <expression>
-        if statementToken['TOKEN'] == 'return':
-            expression = self.parseExpression()
-            if expression is not None and self.peekNextToken()['TOKEN'] == ';':
-                self.getCurrentToken()
-                return ['return', expression]
-            else:
-                self.currentTokenIndex = currentIndex
-                return None
-            
-        # 'assignment' <expression>    
-        if statementToken['TYPE'] == 'IDENTIFIER':
-            if self.peekNextToken()['TOKEN'] == '=':
-                consumedToken = self.getCurrentToken()
-                expression = self.parseExpression()
-                if expression is not None and self.peekNextToken()['TOKEN'] == ';':
-                    self.getCurrentToken()
-                    return ['assignment', TreeNode(statementToken['TOKEN'], expression)]
-            else:
-                self.currentTokenIndex = currentIndex
-                return None
+        statement = self.parseReturn()
+        if statement is not None:
+            return statement
+        
+        statement = self.parseDeclaration()
+        if statement is not None:
+            return statement
+        
+        statement = self.parseDeclarationAssignment()
+        if statement is not None:
+            return statement
 
-        # If we hit this point, the statement is not valid, reset the token index
-        self.currentTokenIndex = currentIndex
+        statement = self.parseAssignment()
+        if statement is not None:
+            return statement
+        
         return None
     
+    # 'return' <expression>
+    def parseReturn(self):
+        # Save index if not global variable
+        currentIndex = self.currentTokenIndex
+        
+        # Get two tokens for check
+        oneTokens = [self.getCurrentToken() for _ in range(1)]
+        
+        match = self.isMatch(oneTokens)
+        
+        if match is None or not match.lastgroup == "RETURN":
+            self.currentTokenIndex = currentIndex
+            return None
+        
+        expression = self.parseExpression()
+        if expression is not None and self.peekNextToken()['TOKEN'] == ';':
+            self.getCurrentToken() # Consume ';'
+            return ['return', expression]
+        else:
+            self.currentTokenIndex = currentIndex
+            return None
+    
+    def parseDeclaration(self):
+        # Save index if not global variable
+        currentIndex = self.currentTokenIndex
+        
+        # Get three tokens for check
+        threeTokens = [self.getCurrentToken() for _ in range(3)]
+        
+        match = self.isMatch(threeTokens)
+        
+        if match is None or not match.lastgroup == "VARIABLE_DECLARATION":
+            self.currentTokenIndex = currentIndex
+            return None
+        
+        completedDeclaration = {threeTokens[1]['TOKEN']: threeTokens[0]['TOKEN']}
+        return completedDeclaration        
+    
+    def parseDeclarationAssignment(self):
+        # Save index if not global variable
+        currentIndex = self.currentTokenIndex
+        
+        # Get three tokens for check
+        threeTokens = [self.getCurrentToken() for _ in range(3)]
+        
+        match = self.isMatch(threeTokens)
+        
+        if match is None or not match.lastgroup == "VARIABLE_DECLARATION_ASSIGNMENT":
+            self.currentTokenIndex = currentIndex
+            return None
+
+        expression = self.parseExpression()
+        if expression is not None and self.peekNextToken()['TOKEN'] == ';':
+            self.getCurrentToken() # Consume ';'
+            return [{threeTokens[1]['TOKEN']:threeTokens[0]['TOKEN']},'assignment', TreeNode(threeTokens[1]['TOKEN'], expression)]
+        else:
+            self.currentTokenIndex = currentIndex
+            return None
+
+    # 'assignment' <expression>    
+    def parseAssignment(self):
+        # Save index if not global variable
+        currentIndex = self.currentTokenIndex
+        
+        # Get two tokens for check
+        twoTokens = [self.getCurrentToken() for _ in range(2)]
+        
+        match = self.isMatch(twoTokens)
+        
+        if match is None or not match.lastgroup == 'VARIABLE_ASSIGNMENT':
+            self.currentTokenIndex = currentIndex
+            return None
+
+        expression = self.parseExpression()
+        if expression is not None and self.peekNextToken()['TOKEN'] == ';':
+            self.getCurrentToken() # Consume ';'
+            return ['assignment', TreeNode(twoTokens[0]['TOKEN'], expression)]
+        else:
+            self.currentTokenIndex = currentIndex
+            return None
+
     # Expr -> Term | Expr + Term | Expr - Term
     def parseExpression(self):
         expression = self.parseTerm()
@@ -137,7 +278,7 @@ class Parser:
         
         return term
 
-    # Val -> (Expr) | INT | ID | - Val
+    # Val -> (Expr) | Constant | ID | - Val
     def parseValue(self):
         consumedToken = self.getCurrentToken()
 
@@ -148,8 +289,8 @@ class Parser:
                 self.getCurrentToken()
                 return value
 
-        # Int
-        elif consumedToken['TYPE'] in ['INTEGER_CONSTANT']:
+        # Constant
+        elif consumedToken['TYPE'] in ['INTEGER_CONSTANT', 'FLOATING_CONSTANT', 'CHAR_CONSTANT', 'STRING_CONSTANT']:
             return TreeNode(consumedToken['TOKEN'])
 
         # ID

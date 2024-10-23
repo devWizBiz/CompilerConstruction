@@ -1,5 +1,6 @@
 # External Libraries
 import argparse
+import pdb
 
 # Internal Libraries
 import support
@@ -39,14 +40,14 @@ def main():
 
     tokens = lexer.tokenize(contents)
     parser = Parser(tokens)
-    abstractSyntaxTree = parser.parseProgram()
-    # tacDict = tac.generateTAC(abstractSyntaxTree, parser.symbolTable)
+    parser.parseProgram()
+    tacDict = tac.generateTAC(parser.abstractSyntaxTree, parser.symbolTable)
 
     fileName = support.retrieveFileName(args.file)
     support.writeToFile(tokens, f"tokens_{fileName}.txt")
-    support.writeToFile(abstractSyntaxTree, f"abstractSyntaxTree_{fileName}.txt")
-    # support.writeToFile(parser.symbol_table, f"symbolTable_{fileName}.txt")
-    # support.writeToFile(tacDict, f"TAC_{fileName}.txt")
+    support.writeToFile(parser.abstractSyntaxTree, f"absSyntaxTree_{fileName}.txt")
+    support.writeToFile(parser.symbolTable, f"symbolTable_{fileName}.txt")
+    support.writeToFile(tacDict, f"TAC_{fileName}.txt")
 
 
     # Check if the lexer flag is set
@@ -54,11 +55,11 @@ def main():
         support.prettyPrintLex(tokens)
 
     if args.parse:
-        support.printAST(abstractSyntaxTree)
-        # support.printSymbolTable(parser.symbol_table)
+        support.printAST(parser.abstractSyntaxTree)
+        support.printSymbolTable(parser.symbolTable)
 
-    # if args.tac:
-    #     support.printTAC(tacDict)
+    if args.tac:
+        support.printTAC(tacDict)
 
 if __name__ == "__main__":
     main()
