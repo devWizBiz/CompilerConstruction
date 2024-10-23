@@ -1,5 +1,10 @@
-WIP
-
-# Expr -> Term | Expr + Term | Expr - Term
-# Term -> Value | Term * Value | Term / Value
-# Val -> (Expr) | Constant | ID | - Val
+program := <functions> | <global variable declarations>
+function := <statements>
+statement := < return <expr> | assignment <expr> | declaration | declaration_assignment <expr> >
+return := <expr>
+assignment := <expr>
+declaration := <TYPE IDENTIFIER>
+delcaration assignment := <TYPE IDENTIFIER <expr>
+expr := Term | Expr + Term | Expr - Term
+term := Value | Term * Value | Term / Value
+value :=  (Expr) | Constant | ID | - Val
