@@ -22,26 +22,6 @@ class TreeNode:
     def __str__(self):
         return str(self.value)
 
-# Testing node structure
-def dfs(node):
-    result = []
-    
-    def helper(current_node):
-        if current_node is None:
-            return
-        
-        # Visit the current node (pre-order traversal)
-        result.append(current_node.value)
-        
-        # Traverse the left and right subtrees
-        helper(current_node.left)
-        helper(current_node.right)
-    
-    # Start the helper function
-    helper(node)
-    
-    return result
-
 class Parser:
     def __init__(self, tokens):
         self.tokens = tokens
@@ -76,6 +56,25 @@ class Parser:
 
         return match
 
+    def depthFirstSearch(self, node):
+        result = []
+        
+        def helper(current_node):
+            if current_node is None:
+                return
+            
+            # Append the current value
+            result.append(current_node.value)
+            
+            # Traverse the left and right subtrees
+            helper(current_node.left)
+            helper(current_node.right)
+        
+        # Start the helper function
+        helper(node)
+        
+        return result
+
     def createSymbolTable(self):
         for key in self.abstractSyntaxTree:
             updatedStatements = []
@@ -104,7 +103,7 @@ class Parser:
             if isinstance(self.abstractSyntaxTree[key], dict):
             
                 for statement in self.abstractSyntaxTree[key]['statements']:
-                    updatedStatements.append([statement[0], dfs(statement[1])])
+                    updatedStatements.append([statement[0], self.depthFirstSearch(statement[1])])
                 self.abstractSyntaxTree[key]['statements'] = updatedStatements
 
     def parseProgram(self):
