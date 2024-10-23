@@ -9,14 +9,20 @@ def generateTAC(abstractSyntaxTree, symbolTable):
     for key in abstractSyntaxTree['Program']:
         if isinstance(abstractSyntaxTree['Program'][key], dict):
             for statement in abstractSyntaxTree['Program'][key]['statements']:
-                if statement[0] == 'assignment':
-                    traversal_list = statement[1]
-                        
-                    # Process the expression starting from index 1
-                    result_var, final_index = processTree(traversal_list, index)
+                statementLength = len(statement[1])
+                if statement[0] == 'assignment' and statementLength > 4:
+                    resultVariable, final_index = processTree(statement[1], index)
 
                     # Assign the final result to the variable
-                    tacList.append(f"{traversal_list[0]} = {result_var}")
+                    tacList.append(f"{statement[1][0]} = {resultVariable}")
+                elif statement[0] == 'assignment' and statementLength <= 4:
+                    
+                    if statementLength == 2:
+                        tacList.append(f"{statement[1][0]} = {statement[1][1]}")
+                    elif statementLength == 4:
+                        tacList.append(f"{statement[1][0]} = {statement[1][2]} {statement[1][1]} {statement[1][3]}")
+                elif statement[0] == 'return':
+                    tacList.append(f"{statement[0]} {statement[1][0]}")
 
             copyOfTacList = copy.deepcopy(tacList)
             tacDict.update({key : copyOfTacList})
@@ -25,14 +31,14 @@ def generateTAC(abstractSyntaxTree, symbolTable):
     return tacDict
     
 # Process the tree
-def processTree(traversal_list, index):
+def processTree(statementList, index):
     global variableCounter
-    token = traversal_list[index]
+    token = statementList[index]
     index += 1
 
     if token in ['+', '-', '*', '/']:
-        left, index = processTree(traversal_list, index)
-        right, index = processTree(traversal_list, index)
+        left, index = processTree(statementList, index)
+        right, index = processTree(statementList, index)
         tempVar = f't{variableCounter}'
         variableCounter += 1
         tacList.append(f"{tempVar} = {left} {token} {right}")
