@@ -41,12 +41,12 @@ def main():
     tokens = lexer.tokenize(contents)
     parser = Parser(tokens)
     parser.parseProgram()
-    tacDict = tac.generateTAC(parser.abstractSyntaxTree, parser.symbolTable)
+    tacDict, symbolTable = tac.generateTAC(parser.abstractSyntaxTree, parser.symbolTable)
 
     fileName = support.retrieveFileName(args.file)
     support.writeToFile(tokens, f"tokens_{fileName}.txt")
     support.writeToFile(parser.abstractSyntaxTree, f"absSyntaxTree_{fileName}.txt")
-    support.writeToFile(parser.symbolTable, f"symbolTable_{fileName}.txt")
+    support.writeToFile(symbolTable, f"symbolTable_{fileName}.txt")
     support.writeToFile(tacDict, f"TAC_{fileName}.txt")
 
 
@@ -56,7 +56,7 @@ def main():
 
     if args.parse:
         support.printAST(parser.abstractSyntaxTree)
-        support.printSymbolTable(parser.symbolTable)
+        support.printSymbolTable(symbolTable)
 
     if args.tac:
         support.printTAC(tacDict)

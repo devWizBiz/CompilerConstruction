@@ -85,8 +85,13 @@ class Parser:
                 self.symbolTable['Global(s)'][key] = {'retType': self.abstractSyntaxTree[key]['retType'], 'args': None, 'vars': {} }
                 
                 for element in self.abstractSyntaxTree[key]['statements']:
-                
+
                     if isinstance(element, list) and len(element) == 3:
+                        lookUpKey = next(iter(element[0]))
+                        if(lookUpKey in self.symbolTable['Global(s)'][key]['vars'] or 
+                                lookUpKey in self.symbolTable['Global(s)']):
+                            raise SyntaxError("Variable already declared")
+                        
                         self.symbolTable['Global(s)'][key]['vars'].update(element[0])
                         updatedStatements.append(element[1:])
                     elif isinstance(element, dict):

@@ -11,7 +11,7 @@ def generateTAC(abstractSyntaxTree, symbolTable):
             for statement in abstractSyntaxTree['Program'][key]['statements']:
                 statementLength = len(statement[1])
                 if statement[0] == 'assignment' and statementLength > 4:
-                    resultVariable, final_index = processTree(statement[1], index)
+                    resultVariable, final_index = processTree(statement[1], index, key, symbolTable)
 
                     # Assign the final result to the variable
                     tacList.append(f"{statement[1][0]} = {resultVariable}")
@@ -28,20 +28,56 @@ def generateTAC(abstractSyntaxTree, symbolTable):
             tacDict.update({key : copyOfTacList})
             tacList.clear()
     
-    return tacDict
+    return tacDict, symbolTable
     
 # Process the tree
-def processTree(statementList, index):
+def processTree(statementList, index, key, symbolTable):
     global variableCounter
     token = statementList[index]
     index += 1
 
     if token in ['+', '-', '*', '/']:
-        left, index = processTree(statementList, index)
-        right, index = processTree(statementList, index)
+        left, index = processTree(statementList, index, key, symbolTable)
+        right, index = processTree(statementList, index, key, symbolTable)
         tempVar = f't{variableCounter}'
         variableCounter += 1
-        tacList.append(f"{tempVar} = {left} {token} {right}")
+        
+        # Confirm types
+        # Left Check
+        if left in symbolTable['Global(s)'][key]['vars'] or left in symbolTable['Global(s)']:
+            leftType = symbolTable['Global(s)'][key]['vars'][left]
+        else:
+            leftType = checkType(left)
+            
+        # Right Check
+        if right in symbolTable['Global(s)'][key]['vars'] or left in symbolTable['Global(s)'][key]:
+            rightType = symbolTable['Global(s)'][key]['vars'][right]
+        else:
+            rightType = checkType(right)
+            
+        # Compare Both
+        if leftType == rightType:
+            symbolTable['Global(s)'][key]['vars'].update({tempVar : leftType})
+            tacList.append(f"{tempVar} = {left} {token} {right}")
+        else:
+            raise SyntaxError("Mismatch Types")
+
         return tempVar, index
     else:
         return token, index
+
+
+def checkType(value):
+    try:
+        int(value)
+        return "int"
+    except ValueError:
+        pass  # Not an integer
+
+    try:
+        float(value)
+        return "float"
+    except ValueError:
+        pass  # Not a float
+
+    return "str"
