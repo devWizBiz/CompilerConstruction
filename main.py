@@ -44,7 +44,7 @@ def main():
     parser = Parser(tokens)
     parser.parseProgram()
     tacDict, symbolTable = tac.generateTAC(parser.abstractSyntaxTree, parser.symbolTable)
-    tactDict = optimizations.constPropFold(tacDict, parser.symbolTable)
+    # tactDict = optimizations.constPropFold(tacDict, parser.symbolTable)
 
     fileName = support.retrieveFileName(args.file)
     support.writeToFile(tokens, f"tokens_{fileName}.txt")
@@ -63,8 +63,8 @@ def main():
     if args.tac:
         support.printTAC(tacDict)
         
-    if args.opt1:
-        support.printTAC(tactDict)
+    # if args.opt1:
+    #     support.printTAC(tactDict)
 
 if __name__ == "__main__":
     main()
