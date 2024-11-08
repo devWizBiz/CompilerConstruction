@@ -7,6 +7,7 @@ import support
 import lexer
 from parser import *
 import tac
+import optimizations
 
 """
 Main function that processes a given C source file and optionally runs a lexer.
@@ -25,6 +26,7 @@ def main():
     argParser.add_argument('-L', '--lexer', action='store_true', help='Print tokenized output')
     argParser.add_argument('-P', '--parse', action='store_true', help='Print AST and Symbol Table')
     argParser.add_argument('-T', '--tac', action='store_true', help='Print Three Address Code')
+    argParser.add_argument('-O1', '--opt1', action='store_true', help='Print Three Address Code with Constant Folding and Propagation Pass')
     argParser.add_argument('file', help='Given C source file')
 
     # Parse the arguments
@@ -42,6 +44,7 @@ def main():
     parser = Parser(tokens)
     parser.parseProgram()
     tacDict, symbolTable = tac.generateTAC(parser.abstractSyntaxTree, parser.symbolTable)
+    tactDict = optimizations.constPropFold(tacDict, parser.symbolTable)
 
     fileName = support.retrieveFileName(args.file)
     support.writeToFile(tokens, f"tokens_{fileName}.txt")
@@ -49,8 +52,7 @@ def main():
     support.writeToFile(symbolTable, f"symbolTable_{fileName}.txt")
     support.writeToFile(tacDict, f"TAC_{fileName}.txt")
 
-
-    # Check if the lexer flag is set
+    # Check if the flags are set
     if args.lexer:
         support.prettyPrintLex(tokens)
 
@@ -60,6 +62,9 @@ def main():
 
     if args.tac:
         support.printTAC(tacDict)
+        
+    if args.opt1:
+        support.printTAC(tactDict)
 
 if __name__ == "__main__":
     main()
