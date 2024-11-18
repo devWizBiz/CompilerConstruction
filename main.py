@@ -1,10 +1,9 @@
 # External Libraries
 import argparse
-import pdb
 
 # Internal Libraries
 import support
-import lexer
+from lexer import Tokenizer
 from parser import *
 import tac
 import optimizations
@@ -40,28 +39,38 @@ def main():
     if(support.checkExtensions(args.file) == False):
         support.warning(f"File is not supported. Results may vary\nPATH: {args.file}\n")
 
-    tokens = lexer.tokenize(contents)
-    parser = Parser(tokens)
-    parser.parseProgram()
-    tacDict, symbolTable = tac.generateTAC(parser.abstractSyntaxTree, parser.symbolTable)
-    # tactDict = optimizations.constPropFold(tacDict, parser.symbolTable)
+    # Create token object, find tokens
+    tokenObj = Tokenizer()
+    tokenObj.findTokens( contents )
+    
+    # Create parser object, parse the contents
+    parser = Parser()
+    parser.parseProgram(tokenObj.tokenDict)
+    
 
-    fileName = support.retrieveFileName(args.file)
-    support.writeToFile(tokens, f"tokens_{fileName}.txt")
-    support.writeToFile(parser.abstractSyntaxTree, f"absSyntaxTree_{fileName}.txt")
-    support.writeToFile(symbolTable, f"symbolTable_{fileName}.txt")
-    support.writeToFile(tacDict, f"TAC_{fileName}.txt")
+    # import pdb;pdb.set_trace()
 
-    # Check if the flags are set
-    if args.lexer:
-        support.prettyPrintLex(tokens)
+    # parser = Parser(tokens)
+    # parser.parseProgram()
+    # tacDict, symbolTable = tac.generateTAC(parser.abstractSyntaxTree, parser.symbolTable)
+    # # tactDict = optimizations.constPropFold(tacDict, parser.symbolTable)
 
-    if args.parse:
-        support.printAST(parser.abstractSyntaxTree)
-        support.printSymbolTable(symbolTable)
+    # fileName = support.retrieveFileName(args.file)
+    # support.writeToFile(tokens, f"tokens_{fileName}.txt")
+    # support.writeToFile(parser.abstractSyntaxTree, f"absSyntaxTree_{fileName}.txt")
+    # support.writeToFile(symbolTable, f"symbolTable_{fileName}.txt")
+    # support.writeToFile(tacDict, f"TAC_{fileName}.txt")
 
-    if args.tac:
-        support.printTAC(tacDict)
+    # # Check if the flags are set
+    # if args.lexer:
+    #     support.prettyPrintLex(tokens)
+
+    # if args.parse:
+    #     support.printAST(parser.abstractSyntaxTree)
+    #     support.printSymbolTable(symbolTable)
+
+    # if args.tac:
+    #     support.printTAC(tacDict)
         
     # if args.opt1:
     #     support.printTAC(tactDict)
