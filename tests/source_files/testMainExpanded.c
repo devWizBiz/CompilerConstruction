@@ -77,6 +77,7 @@ int main(){
 
     if ( a <= b )
     {
+        int y;
         k = a * 2;
         return k;
     }

@@ -17,8 +17,11 @@ class Parser:
         self.tokens = {}
         self.currentTokenIndex = 0
 
-        # Initialize Symbol Table
-        
+        # Initialize Symbol Table and Abstract Syntax Tree
+        self.symbolTable = {}
+        self.symbolTable['Globals'] = {}
+        self.abstractSyntaxTree = {}
+
         # Load Parser Pattern for matches in token dictionary
         self.loadParsePattern()
   
@@ -132,16 +135,44 @@ class Parser:
         # Keep peeking until no tokens remain
         while self.peekNextToken() is not None:
             info = self.parseFunction()
+           
+            if info is not None:
+                self.symbolTable[info[0]] = { 
+                    'retType' : info[1],
+                    'params' : None,
+                    'vars' : {}
+                }
+                self.abstractSyntaxTree[info[0]] = {'statements' : [] }
+
+                for tup in info[2]:
+                    if isinstance(tup, tuple) and len(tup) == 3: # Statements
+                        matchName, declaration, assignment = tup
+                        if matchName in ['VARIABLE_DECLARATION', 'VARIABLE_DECLARATION_ASSIGNMENT']:
+                            self.symbolTable[info[0]]['vars'].update({declaration[0] : declaration[1]})
+
+                        if matchName in ['VARIABLE_ASSIGNMENT', 'VARIABLE_DECLARATION_ASSIGNMENT', 'RETURN']:
+                            self.abstractSyntaxTree[info[0]]['statements'].append((matchName, assignment))
+                    elif isinstance(tup[1], list):
+                            for matchName, declaration, assignment in tup[1]: # Conditionals
+                                if matchName in ['VARIABLE_DECLARATION', 'VARIABLE_DECLARATION_ASSIGNMENT']:
+                                    self.symbolTable[info[0]]['vars'].update({declaration[0] : declaration[1]})
+
+                                if matchName in ['VARIABLE_ASSIGNMENT', 'VARIABLE_DECLARATION_ASSIGNMENT', 'RETURN']:
+                                        self.abstractSyntaxTree[info[0]]['statements'].append((matchName, assignment))
+                    else:
+                        self.abstractSyntaxTree[info[0]]['statements'].append(tup)
 
             if info is None:
                 info = self.parseGlobal()
+                if info is not None:
+                    self.symbolTable['Globals'].update({info[0] : info[1]})
 
             if info is None:
                 unmatchedToken = self.getCurrentToken()
                 line = unmatchedToken['LINE']
                 column = unmatchedToken['COL']
                 value = unmatchedToken['TOKEN']
-                support.error(f'Cannot match token found at LINE {line} COLUMN {column}: {value}')       
+                support.error(f'Cannot match token found at LINE {line} COLUMN {column}: {value}')
             
     """
     function <statements,conditions>
@@ -178,7 +209,7 @@ class Parser:
                 return None
         else: # Function done, create function dictionary and return
             self.getCurrentToken() # Consume '}'
-            completedFunction = {fiveTokens[1]['TOKEN']: {'retType': fiveTokens[0]['TOKEN'], 'statements': listOfStatements}}
+            completedFunction = (fiveTokens[1]['TOKEN'], fiveTokens[0]['TOKEN'], listOfStatements)
             return completedFunction
     
     """
