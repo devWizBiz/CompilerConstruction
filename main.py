@@ -4,8 +4,8 @@ import argparse
 # Internal Libraries
 import support
 from lexer import Tokenizer
-from parser import *
-import tac
+from parser import Parser
+from tac import TAC
 
 """
 Main function that processes a given C source file and optionally runs a lexer.
@@ -46,12 +46,10 @@ def main():
     parser = Parser()
     parser.parseProgram(tokenObj.tokenDict)
     
+    # Create three address code
+    tac = TAC()
+    tac.generateTAC(parser.abstractSyntaxTree, parser.symbolTable)
 
-    # import pdb;pdb.set_trace()
-
-    # parser = Parser(tokens)
-    # parser.parseProgram()
-    # tacDict, symbolTable = tac.generateTAC(parser.abstractSyntaxTree, parser.symbolTable)
     # # tactDict = optimizations.constPropFold(tacDict, parser.symbolTable)
 
     # fileName = support.retrieveFileName(args.file)

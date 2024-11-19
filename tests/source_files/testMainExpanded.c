@@ -79,6 +79,10 @@ int main(){
     {
         int y;
         k = a * 2;
+        if ( k == b )
+        {
+            return b;
+        }
         return k;
     }
     else

@@ -153,12 +153,14 @@ class Parser:
                         if matchName in ['VARIABLE_ASSIGNMENT', 'VARIABLE_DECLARATION_ASSIGNMENT', 'RETURN']:
                             self.abstractSyntaxTree[info[0]]['statements'].append((matchName, assignment))
                     elif isinstance(tup[1], list):
+                            self.abstractSyntaxTree[info[0]]['statements'].append((tup[0], "START"))
                             for matchName, declaration, assignment in tup[1]: # Conditionals
                                 if matchName in ['VARIABLE_DECLARATION', 'VARIABLE_DECLARATION_ASSIGNMENT']:
                                     self.symbolTable[info[0]]['vars'].update({declaration[0] : declaration[1]})
 
                                 if matchName in ['VARIABLE_ASSIGNMENT', 'VARIABLE_DECLARATION_ASSIGNMENT', 'RETURN']:
                                         self.abstractSyntaxTree[info[0]]['statements'].append((matchName, assignment))
+                            self.abstractSyntaxTree[info[0]]['statements'].append((tup[0], "END"))
                     else:
                         self.abstractSyntaxTree[info[0]]['statements'].append(tup)
 
@@ -308,8 +310,12 @@ class Parser:
             if statement is not None:
                 ifStatements.append(statement)
             else:
-                self.currentTokenIndex = currentIndex
-                return None
+                statement = self.parseConditional()
+                if statement is not None:
+                    ifStatements.append(statement)
+                else:
+                    self.currentTokenIndex = currentIndex
+                    return None
 
         self.getCurrentToken()
 
@@ -326,8 +332,12 @@ class Parser:
                 if statement is not None:
                     elseStatements.append(statement)
                 else:
-                    self.currentTokenIndex = currentIndex
-                    return None
+                    statement = self.parseConditional()
+                    if statement is not None:
+                        elseStatements.append(statement)
+                    else:
+                        self.currentTokenIndex = currentIndex
+                        return None
 
             self.getCurrentToken()
 

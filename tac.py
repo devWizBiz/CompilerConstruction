@@ -1,129 +1,106 @@
-import copy
 import pdb
-index = 1
+index = 0
 label = 1
 tacList = []
-tacDict = {}
 variableCounter = 1
 
-def generateTAC(abstractSyntaxTree, symbolTable):
-    astProg = abstractSyntaxTree['Program']
-    for key in astProg:
-        functionStatements = astProg[key]
-        for statement in functionStatements:
-            if statement[0][0][0] == 'conditional':
-                global label
-                condition, ifBranch, elseBranch = statement[:]
-                
-                ifLabel = f"L{label}"
-                label += 1
-                elseLabel = f"L{label}"
-                label += 1
-                endLabel = f"L{label}"
-                label += 1
+class TAC:
+    def __init__(self):
+        self.tactDict = {}
 
-                op, left, right = condition[0][-1]
-                tacList.append((f"if {left} {op} {right}", "goto", ifLabel))
-                tacList.append(("goto", elseLabel))
+    """
+    Assemble the three address code while updating the Symbol Table
+    """
+    def generateTAC(self, abstractSyntaxTree, symbolTable):
+        for key in abstractSyntaxTree:
+            self.tactDict[key] = []
+            for type, assignment in abstractSyntaxTree[key]['statements']:
+                numberOfOperators = sum(1 for item in assignment if item in ['+', '-', '*', '/', '<='])
+            
+                if numberOfOperators == 0 and type not in ['IF', 'ELSE']:
 
-                tacList.append((ifLabel,))
-                for statement in ifBranch:
-                    processStatement(statement)
+                    if type == 'RETURN':
+                        self.tactDict[key].append((type, assignment))
+                    elif type in ['VARIABLE_DECLARATION_ASSIGNMENT', 'VARIABLE_ASSIGNMENT']:
+                        left, right = assignment
+                        self.tactDict[key].append((left, '=', right))
 
-                tacList.append(("goto", endLabel))
+                elif numberOfOperators == 1 and len(assignment) == 4:
+                    assign, operator, left, right = assignment
+                    self.tactDict[key].append((assign, '=', left, operator, right))
 
-                tacList.append((elseLabel,))
-                for statement in elseBranch:
-                    processStatement(statement)
+                elif numberOfOperators == 1 and len(assignment) == 3:
+                    resultVariable, exitingIndex = self.processTree(assignment, index, key, symbolTable)
+                    tmpVar, left, operator, right = tacList[0]
 
-                tacList.append((endLabel,))
-            else:
-                if statement[0] == 'return':
-                    tacList.append((statement[0], statement[-1][0]))
-                elif statement[0] == 'declaration':
-                    tacList.append((statement[1], statement[-1][0]))
-                elif statement[0] in ['assignment', 'declarationAssignment'] and len(statement[-1]) <= 4:
-                    if len(statement[-1]) == 2:
-                        tacList.append((statement[-1][0], statement[-1][1]))
-                    elif len(statement[-1]) == 4:
-                        tacList.append((statement[-1][0], statement[-1][2], statement[-1][1], statement[-1][3]))
+                    if type != 'CONDITIONAL':
+                        self.tactDict[key].append((tmpVar, '=', left, operator, right))
+                    else:
+                        self.tactDict[key].append(('CONDITION', tmpVar, '=', left, operator, right))
+
+                    if type == 'RETURN':
+                        self.tactDict[key].append(('RETURN', tmpVar))
+
+                    tacList.clear()
+
+                elif numberOfOperators >= 2:
+                    resultVariable, exitingIndex = self.processTree(assignment, index + 1, key, symbolTable)
+                    for tmpVar, left, operator, right in tacList:
+                        self.tactDict[key].append((tmpVar, '=', left, operator, right))
+                    
+                    if type == 'RETURN':
+                        self.tactDict[key].append(('RETURN', tmpVar))
+
+                    tacList.clear()
                 else:
-                    resultVariable, final_index = processTree(statement[-1], index, key, symbolTable)
+                    self.tactDict[key].append((type, assignment))
 
-        copyOfTacList = copy.deepcopy(tacList)
-        tacDict.update({key : copyOfTacList})
-        tacList.clear()
-    cfgDict = generateCFG(tacDict)
-    return tacDict, symbolTable
-    
-def processStatement(statement):
-    if len(statement) == 2:
-        tacList.append((statement[0], statement[1]))
-    elif len(statement) == 3:
-        if statement[1] != 'assignment':
-            tacList.append((statement[1], statement[2]))
-        else:
-            tacList.append((statement[2]))
-    else:
-        tacList.append(tuple(statement))
+        print(self.tactDict)
 
-def processTree(statementList, index, key, symbolTable):
-    
-    global variableCounter
-    token = statementList[index]
-    index += 1
-
-    if token in ['+', '-', '*', '/']:
-        left, index = processTree(statementList, index, key, symbolTable)
-        right, index = processTree(statementList, index, key, symbolTable)
-        tempVar = f't{variableCounter}'
-        variableCounter += 1
+    """
+    Process the tree to include the new tempVariables and correct order of operations
+    """
+    def processTree(self, statementList, index, key, symbolTable):
         
-        # Confirm types
-        # Left Check
-        if left in symbolTable[key]['vars']:
-            leftType = symbolTable[key]['vars'][left]
-        elif left in symbolTable:
-            leftType = symbolTable[key]
-        else:
-            leftType = checkType(left, symbolTable)
+        global variableCounter
+        token = statementList[index]
+        index += 1
+
+        if token in ['+', '-', '*', '/', '==', '!=', '<', '<=', '>', '>=']:
+            left, index = self.processTree(statementList, index, key, symbolTable)
+            right, index = self.processTree(statementList, index, key, symbolTable)
+            tempVar = f't{variableCounter}'
+            variableCounter += 1
             
-        # Right Check
-        if right in symbolTable[key]['vars']:
-            rightType = symbolTable[key]['vars'][right]
-        elif right in symbolTable:
-            rightType = symbolTable[key]
+            # Confirm types
+            # Left Check
+            leftType = self.checkType(left, key, symbolTable)
+                
+            # Right Check
+            rightType = self.checkType(right, key, symbolTable)
+                
+            # Compare Both
+            if leftType == rightType:
+                symbolTable[key]['vars'].update({tempVar : leftType})
+                tacList.append((tempVar, left, token, right))
+            else:
+                raise SyntaxError("Mismatch Types")
+
+            return tempVar, index
         else:
-            rightType = checkType(right, symbolTable)
-            
-        # Compare Both
-        if leftType == rightType:
-            symbolTable[key]['vars'].update({tempVar : leftType})
-            tacList.append((tempVar, left, token, right))
-        else:
-            raise SyntaxError("Mismatch Types")
+            return token, index
+    
+    """
+    Ensure the types match
+    """
+    def checkType(self, val, key, symbolTable):
 
-        return tempVar, index
-    else:
-        return token, index
-
-# -------- WIP --------------
-def generateCFG(tacDict):
-    cfgDict = {}
-
-    return cfgDict
-
-def checkType(value, symbolTable): # TODO: Refactor checkType
-    try:
-        int(value)
-        return "int"
-    except ValueError:
-        pass  # Not an integer
-
-    try:
-        float(value)
-        return "float"
-    except ValueError:
-        pass  # Not a float
-
-    return "str"
+        if val in symbolTable[key]['vars']: # Function Scope
+            return symbolTable[key]['vars'][val]
+        elif val in symbolTable: # Global Scope
+            return symbolTable[key]
+        else: # INTEGER_CONSTANT or FLOAT_CONSTANT
+            if '.' in val:
+                return 'float'
+            else:
+                return 'int'
