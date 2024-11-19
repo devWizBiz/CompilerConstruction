@@ -15,47 +15,38 @@ class TAC:
         for key in abstractSyntaxTree:
             self.tactDict[key] = []
             for type, assignment in abstractSyntaxTree[key]['statements']:
-                numberOfOperators = sum(1 for item in assignment if item in ['+', '-', '*', '/', '<='])
-            
-                if numberOfOperators == 0 and type not in ['IF', 'ELSE']:
-
-                    if type == 'RETURN':
+                if( assignment not in ['STARTS', 'ENDS']):
+                    if len(assignment) == 1:
                         self.tactDict[key].append((type, assignment))
-                    elif type in ['VARIABLE_DECLARATION_ASSIGNMENT', 'VARIABLE_ASSIGNMENT']:
+                    elif len(assignment) == 2:
                         left, right = assignment
                         self.tactDict[key].append((left, '=', right))
+                    elif len(assignment) == 3:
+                        resultVariable, exitingIndex = self.processTree(assignment, index, key, symbolTable)
+                        tmpVar, left, operator, right = tacList[0]
 
-                elif numberOfOperators == 1 and len(assignment) == 4:
-                    assign, operator, left, right = assignment
-                    self.tactDict[key].append((assign, '=', left, operator, right))
+                        if type != 'CONDITIONAL':
+                            self.tactDict[key].append((tmpVar, '=', left, operator, right))
+                        else:
+                            self.tactDict[key].append(('CONDITION', tmpVar, '=', left, operator, right))
 
-                elif numberOfOperators == 1 and len(assignment) == 3:
-                    resultVariable, exitingIndex = self.processTree(assignment, index, key, symbolTable)
-                    tmpVar, left, operator, right = tacList[0]
+                        if type == 'RETURN':
+                            self.tactDict[key].append(('RETURN', tmpVar))
 
-                    if type != 'CONDITIONAL':
-                        self.tactDict[key].append((tmpVar, '=', left, operator, right))
-                    else:
-                        self.tactDict[key].append(('CONDITION', tmpVar, '=', left, operator, right))
+                        tacList.clear()
+                    elif len(assignment) == 4:
+                        assign, operator, left, right = assignment
+                        self.tactDict[key].append((assign, '=', left, operator, right))
+                    elif len(assignment) > 4:
+                        resultVariable, exitingIndex = self.processTree(assignment, index + 1, key, symbolTable)
+                        for tmpVar, left, operator, right in tacList:
+                            self.tactDict[key].append((tmpVar, '=', left, operator, right))
+                        self.tactDict[key].append((assignment[0], '=', tmpVar))
+                        
+                        if type == 'RETURN':
+                            self.tactDict[key].append(('RETURN', tmpVar))
 
-                    if type == 'RETURN':
-                        self.tactDict[key].append(('RETURN', tmpVar))
-
-                    tacList.clear()
-
-                elif numberOfOperators >= 2:
-                    resultVariable, exitingIndex = self.processTree(assignment, index + 1, key, symbolTable)
-                    for tmpVar, left, operator, right in tacList:
-                        self.tactDict[key].append((tmpVar, '=', left, operator, right))
-                    
-                    if type == 'RETURN':
-                        self.tactDict[key].append(('RETURN', tmpVar))
-
-                    tacList.clear()
-                else:
-                    self.tactDict[key].append((type, assignment))
-
-        print(self.tactDict)
+                        tacList.clear()  
 
     """
     Process the tree to include the new tempVariables and correct order of operations

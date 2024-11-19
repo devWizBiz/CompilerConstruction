@@ -21,10 +21,13 @@ class Parser:
         self.symbolTable = {}
         self.symbolTable['Globals'] = {}
         self.abstractSyntaxTree = {}
+        
+        # Initialize allConditionStatements
+        self.allConditionStatements = []
 
         # Load Parser Pattern for matches in token dictionary
         self.loadParsePattern()
-  
+
     """
     Loads the parse patterns that will be used to determine the match for the input of the tokens dictionary.
     """        
@@ -116,6 +119,18 @@ class Parser:
         return result
 
     """
+    Unwrap the nested lists
+    """
+    def unwrapConditions(self, assignment):
+        result = []
+        for item in assignment:
+            if isinstance(item, list):
+                result.extend(self.unwrapConditions(item))
+            else:
+                result.append(item)
+        return result
+
+    """
     START
         - Parse Function
             -- Parse Statement
@@ -135,7 +150,7 @@ class Parser:
         # Keep peeking until no tokens remain
         while self.peekNextToken() is not None:
             info = self.parseFunction()
-           
+
             if info is not None:
                 self.symbolTable[info[0]] = { 
                     'retType' : info[1],
@@ -143,26 +158,22 @@ class Parser:
                     'vars' : {}
                 }
                 self.abstractSyntaxTree[info[0]] = {'statements' : [] }
-
-                for tup in info[2]:
-                    if isinstance(tup, tuple) and len(tup) == 3: # Statements
-                        matchName, declaration, assignment = tup
-                        if matchName in ['VARIABLE_DECLARATION', 'VARIABLE_DECLARATION_ASSIGNMENT']:
-                            self.symbolTable[info[0]]['vars'].update({declaration[0] : declaration[1]})
-
-                        if matchName in ['VARIABLE_ASSIGNMENT', 'VARIABLE_DECLARATION_ASSIGNMENT', 'RETURN']:
-                            self.abstractSyntaxTree[info[0]]['statements'].append((matchName, assignment))
-                    elif isinstance(tup[1], list):
-                            self.abstractSyntaxTree[info[0]]['statements'].append((tup[0], "START"))
-                            for matchName, declaration, assignment in tup[1]: # Conditionals
-                                if matchName in ['VARIABLE_DECLARATION', 'VARIABLE_DECLARATION_ASSIGNMENT']:
-                                    self.symbolTable[info[0]]['vars'].update({declaration[0] : declaration[1]})
-
-                                if matchName in ['VARIABLE_ASSIGNMENT', 'VARIABLE_DECLARATION_ASSIGNMENT', 'RETURN']:
-                                        self.abstractSyntaxTree[info[0]]['statements'].append((matchName, assignment))
-                            self.abstractSyntaxTree[info[0]]['statements'].append((tup[0], "END"))
+                for assignment in info[2]:
+                    if isinstance(assignment, list):
+                        result = self.unwrapConditions(assignment)
+                        for matchName, declaration, assignment in result:
+                            if declaration is not None:
+                                self.symbolTable[info[0]]['vars'].update({declaration[0] : declaration[1]})
+                                
+                            if assignment is not None:
+                                self.abstractSyntaxTree[info[0]]['statements'].append((matchName, assignment))
                     else:
-                        self.abstractSyntaxTree[info[0]]['statements'].append(tup)
+                        matchName, declaration, assignment = assignment
+                        if declaration is not None:
+                            self.symbolTable[info[0]]['vars'].update({declaration[0] : declaration[1]})
+                                
+                        if assignment is not None:
+                            self.abstractSyntaxTree[info[0]]['statements'].append((matchName, assignment))
 
             if info is None:
                 info = self.parseGlobal()
@@ -245,7 +256,7 @@ class Parser:
             expression = self.getExpressionAndEnd()
             if expression is not None:
                 return (match.lastgroup, (totalTokens[1]['TOKEN'], totalTokens[0]['TOKEN']),
-                         self.depthFirstSearch(TreeNode(totalTokens[1]['TOKEN'], expression)))
+                        self.depthFirstSearch(TreeNode(totalTokens[1]['TOKEN'], expression)))
 
         self.currentTokenIndex = currentIndex
             
@@ -341,7 +352,22 @@ class Parser:
 
             self.getCurrentToken()
 
-        return ('CONDITIONAL', condition), ('IF', ifStatements), ('ELSE', elseStatements)
+        listOfStatements = []
+        
+        listOfStatements.append(('CONDITIONAL', None, condition))
+        listOfStatements.append(('IF', None, 'STARTS'))
+        for statement in ifStatements:
+            listOfStatements.append(statement)
+
+        listOfStatements.append(('IF', None, 'ENDS'))
+        listOfStatements.append(('ELSE', None, 'STARTS'))
+
+        for statement in elseStatements:
+            listOfStatements.append(statement)
+
+        listOfStatements.append(('ELSE', None, 'ENDS'))
+
+        return listOfStatements
 
     """
     condition <IDENTIFIER|INTEGER_CONSTANT> <comparison operator> <IDENTIFIER|INTEGER_CONSTANT>
