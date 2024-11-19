@@ -2,51 +2,26 @@
 import re
 import pdb
 # Internal Libraries
-# N/A
+import support
 
-# TMP
 class TreeNode:
     def __init__(self, value, left=None, right=None):
         self.value = value
         self.left = left
         self.right = right
-
-    def __str__(self):
-        return str(self.value)
+    
 class Parser:
     def __init__(self):
         
         # Initialize token dictionary, token index
         self.tokens = {}
         self.currentTokenIndex = 0
+
+        # Initialize Symbol Table
         
         # Load Parser Pattern for matches in token dictionary
         self.loadParsePattern()
-
-    # TMP
-    def depthFirstSearch(self, node):
-        result = []
-        
-        def helper(current_node):
-            if current_node is None:
-                return
-            
-            try:
-                # Append the current value
-                result.append(current_node.value)
-            except:
-                result.append(current_node)
-                return result
-            
-            # Traverse the left and right subtrees
-            helper(current_node.left)
-            helper(current_node.right)
-        
-        # Start the helper function
-        helper(node)
-        
-        return result
-    
+  
     """
     Loads the parse patterns that will be used to determine the match for the input of the tokens dictionary.
     """        
@@ -111,6 +86,33 @@ class Parser:
         self.currentTokenIndex += 1
 
     """
+    Take the TreeNode and turn it into a readable and order format
+    """
+    def depthFirstSearch(self, node):
+        result = ()
+        
+        def helper(current_node):
+            nonlocal result  # Use nonlocal to modify the enclosing `result` variable
+            if current_node is None:
+                return
+            
+            try:
+                # Append the current value
+                result += (current_node.value,)
+            except:
+                result += (current_node,)
+                return
+            
+            # Traverse the left and right subtrees
+            helper(current_node.left)
+            helper(current_node.right)
+        
+        # Start the helper function
+        helper(node)
+        
+        return result
+
+    """
     START
         - Parse Function
             -- Parse Statement
@@ -121,8 +123,6 @@ class Parser:
                             ------ Parse Value
             -- Parse Conditional
                 --- Parse Statements
-        - Parse Global
-            -- Parse declaration
     END    
     """
     def parseProgram(self, tokenDict):
@@ -132,12 +132,22 @@ class Parser:
         # Keep peeking until no tokens remain
         while self.peekNextToken() is not None:
             info = self.parseFunction()
+
+            if info is None:
+                info = self.parseGlobal()
+
+            if info is None:
+                unmatchedToken = self.getCurrentToken()
+                line = unmatchedToken['LINE']
+                column = unmatchedToken['COL']
+                value = unmatchedToken['TOKEN']
+                support.error(f'Cannot match token found at LINE {line} COLUMN {column}: {value}')       
             
     """
     function <statements,conditions>
     """
     def parseFunction(self):
-        # Save index if not global variable
+        # Save index if not function
         currentIndex = self.currentTokenIndex
         
         # Get five tokens for check
@@ -155,31 +165,14 @@ class Parser:
             statement = self.parseStatement()
             
             if statement is None:
-                statement = self.parseConditional()
+                conditionalStatement = self.parseConditional()
+                if conditionalStatement is not None:
+                    for line in conditionalStatement:
+                        listOfStatements.append(line)
+                    continue
+
             if statement is not None:
-                if statement[0] in ['VARIABLE_DECLARATION', 'VARIABLE_DECLARATION_ASSIGNMENT']:
-                    statement = (statement[0], statement[1],  tuple(self.depthFirstSearch(statement[2])))
-                    listOfStatements.append(statement)
-                elif statement[0] in ['VARIABLE_ASSIGNMENT',  'RETURN']:
-                    statement = ((statement[0]), tuple(self.depthFirstSearch(statement[1])))
-                    listOfStatements.append(statement)
-                elif statement[0][0] in 'conditional': # TODO: Need to clean this up, probably another function
-                    conditionalList = []
-                    for condition, treeNode in statement:
-                        if isinstance(treeNode, list):
-                            tmpList = []
-                            for branch in treeNode:
-                                if branch[0] in ['VARIABLE_DECLARATION', 'VARIABLE_DECLARATION_ASSIGNMENT']:
-                                    statement = ((condition), branch[1], tuple(self.depthFirstSearch(branch[2])))
-                                    tmpList.append(statement)
-                                elif branch[0] in ['VARIABLE_ASSIGNMENT',  'RETURN']:
-                                    statement = ((condition), branch[0], tuple(self.depthFirstSearch(branch[1])))
-                                    tmpList.append(statement)
-                            conditionalList.append(tmpList)
-                        else:
-                            statement = ((condition), tuple(self.depthFirstSearch(treeNode)))
-                            conditionalList.append([statement])
-                    listOfStatements.append(conditionalList)
+                listOfStatements.append(statement)
             else:
                 self.currentTokenIndex = currentIndex
                 return None
@@ -192,8 +185,16 @@ class Parser:
     declaration to Symbol Table
     """
     def parseGlobal(self):
-        pass
-    
+        # Save index if not global variable
+        currentIndex = self.currentTokenIndex
+
+        statement = self.parseStatement()
+        if statement is not None and statement[0] == "VARIABLE_DECLARATION":
+            return statement[1]
+        else:
+            self.currentTokenIndex = currentIndex
+            return None
+
     """
     declaration to Symbol Table
     return <expression> | assignment <expression>
@@ -206,13 +207,12 @@ class Parser:
         match = self.isMatch(totalTokens)
     
         if match is not None and match.lastgroup == "VARIABLE_DECLARATION":
-            completedDeclaration = (match.lastgroup, totalTokens[0]['TOKEN'], (totalTokens[1]['TOKEN']))
-            return completedDeclaration 
+            return (match.lastgroup, (totalTokens[1]['TOKEN'], totalTokens[0]['TOKEN']), None ) 
         elif match is not None and match.lastgroup == "VARIABLE_DECLARATION_ASSIGNMENT":
             expression = self.getExpressionAndEnd()
             if expression is not None:
-                # Append Symbol Table
-                return (match.lastgroup, totalTokens[0]['TOKEN'], TreeNode(totalTokens[1]['TOKEN'], expression))
+                return (match.lastgroup, (totalTokens[1]['TOKEN'], totalTokens[0]['TOKEN']),
+                         self.depthFirstSearch(TreeNode(totalTokens[1]['TOKEN'], expression)))
 
         self.currentTokenIndex = currentIndex
             
@@ -223,7 +223,7 @@ class Parser:
         if match is not None and match.lastgroup == "VARIABLE_ASSIGNMENT":
             expression = self.getExpressionAndEnd()
             if expression is not None:
-                return (match.lastgroup, TreeNode(totalTokens[0]['TOKEN'], expression))
+                return (match.lastgroup, None, self.depthFirstSearch(TreeNode(totalTokens[0]['TOKEN'], expression)))
 
         self.currentTokenIndex = currentIndex
 
@@ -234,7 +234,10 @@ class Parser:
         if match is not None and match.lastgroup == "RETURN":
             expression = self.getExpressionAndEnd()
             if expression is not None:
-                return (match.lastgroup, expression)
+                returnTuple = self.depthFirstSearch(expression)
+                if len(returnTuple) == 1:
+                    returnTuple = returnTuple[0]
+                return (match.lastgroup, None, returnTuple)
 
         # No other options
         self.currentTokenIndex = currentIndex
@@ -297,7 +300,7 @@ class Parser:
 
             self.getCurrentToken()
 
-        return ('conditional', condition), ('if', ifStatements), ('else', elseStatements)
+        return ('CONDITIONAL', condition), ('IF', ifStatements), ('ELSE', elseStatements)
 
     """
     condition <IDENTIFIER|INTEGER_CONSTANT> <comparison operator> <IDENTIFIER|INTEGER_CONSTANT>
@@ -315,7 +318,7 @@ class Parser:
         if right is None:
             return None
 
-        return TreeNode(operatorToken['TOKEN'], left, right)
+        return self.depthFirstSearch(TreeNode(operatorToken['TOKEN'], left, right))
 
     """
     Expr -> Term | Expr + Term | Expr - Term

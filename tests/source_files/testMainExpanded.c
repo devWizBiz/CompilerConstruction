@@ -1,16 +1,4 @@
-int i;
-int j = 0;
-
-void testStringFunction(){
-    char s[] = '2';
-    char stringExample[] = "Hello, this is a test function";
-    char stringConst;
-    stringConst = "sss";
-}
-
-char testReturnCharFunction(){
-    return 'c';
-}
+int foo;
 
 int testReturnIntFunction(){
     return 12;
@@ -80,8 +68,24 @@ float calculateQuotientOfFloats(){
 int main(){
     int tmp = 12;                   // Integer \n variable
     float t_VarOne = 3.14;           // Float variable
-    char  t_VarTwo = 'c';             // Character variable
-    char  t_var3[] = "Hello, this is a string"; // String variable (array of chars)
+    int a = 2;
+    int b = 10;
+    int p = 3 + 4 * tmp + (b/a);
+
+    int k;
+    k = 1;
+
+    if ( a <= b )
+    {
+        k = a * 2;
+        return k;
+    }
+    else
+    {
+        k = b * 2;
+        return k + 1;
+    }
+
     /* This is a test block of "code" commented out.
     It expands at least more than one line in this test case. \n
     A multi-line can be only one line as well*/

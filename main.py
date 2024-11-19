@@ -6,7 +6,6 @@ import support
 from lexer import Tokenizer
 from parser import *
 import tac
-import optimizations
 
 """
 Main function that processes a given C source file and optionally runs a lexer.
