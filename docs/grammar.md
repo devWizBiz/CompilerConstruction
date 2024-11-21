@@ -8,6 +8,7 @@ statement              := return <expr>
                         | assignment <expr> 
                         | declaration 
                         | declaration_assignment <expr>
+                        | conditional <condition> if <statements> else < statements >
 return                 := <expr>
 assignment             := <expr>
 declaration            := TYPE IDENTIFIER
