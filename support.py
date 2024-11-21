@@ -34,7 +34,6 @@ def printSymbolTable(input):
                             
 def printAST(input):
     print("#########--- Abstract Syntax Tree ---#########")
-    input = input['Program']
     for key in input:
         print(f"-- {key}")
         if type(input[key]) == dict:
@@ -49,6 +48,14 @@ def printTAC(input):
         print(f"-- {key}")
         for statement in input[key]:
             print(f"---- {statement}")
+            
+def printOptimizedPass(input):
+    print("#########--- Optimized Pass Three Address Code ---#########")
+    for key in input:
+        print(f"-- {key}")
+        for name, basicBlockNumber, tacList in input[key]:
+            for tac in tacList:
+                print(f"---- {tac}")
 
 def writeToFile(input, fileName):
     with open(fileName, 'w') as file:

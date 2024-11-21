@@ -6,6 +6,7 @@ import support
 from lexer import Tokenizer
 from parser import Parser
 from tac import TAC
+from optimizer import Optimizer
 
 """
 Main function that processes a given C source file and optionally runs a lexer.
@@ -21,10 +22,12 @@ def main():
     argParser = argparse.ArgumentParser(description='Construction Compiler with various arguments')
 
     # Add Arguments
-    argParser.add_argument('-L', '--lexer', action='store_true', help='Print tokenized output')
-    argParser.add_argument('-P', '--parse', action='store_true', help='Print AST and Symbol Table')
-    argParser.add_argument('-T', '--tac', action='store_true', help='Print Three Address Code')
-    argParser.add_argument('-O1', '--opt1', action='store_true', help='Print Three Address Code with Constant Folding and Propagation Pass')
+    argParser.add_argument('-L', '--lexer', action='store_true', help='Tokenized output')
+    argParser.add_argument('-P', '--parse', action='store_true', help='AST and Symbol Table')
+    argParser.add_argument('-T', '--tac', action='store_true', help='Three Address Code')
+    argParser.add_argument('-O1', '--opt1', action='store_true', help='Constant Propagation optimization (last used optimization will be shown)')
+    argParser.add_argument('-O2', '--opt2', action='store_true', help='Constant Folding optimization (last used optimization will be shown)')
+    argParser.add_argument('-O3', '--opt3', action='store_true', help='Dead Code Elimination optimization (last used optimization will be shown)')
     argParser.add_argument('file', help='Given C source file')
 
     # Parse the arguments
@@ -43,34 +46,36 @@ def main():
     tokenObj.findTokens( contents )
     
     # Create parser object, parse the contents
-    parser = Parser()
-    parser.parseProgram(tokenObj.tokenDict)
+    parser = Parser(tokenObj.tokenDict)
+    ST, AST = parser.parseProgram()
     
     # Create three address code
     tac = TAC()
-    tac.generateTAC(parser.abstractSyntaxTree, parser.symbolTable)
+    tac.generateTAC(AST.AbstractSyntaxTreeDictionary, ST.SymbolTableDictionary)
 
-    # # tactDict = optimizations.constPropFold(tacDict, parser.symbolTable)
+    optimizations = [args.opt1, args.opt2, args.opt3 ]
+    optimize = Optimizer(tac.basicBlockDict, ST.SymbolTableDictionary, optimizations)
 
-    # fileName = support.retrieveFileName(args.file)
-    # support.writeToFile(tokens, f"tokens_{fileName}.txt")
-    # support.writeToFile(parser.abstractSyntaxTree, f"absSyntaxTree_{fileName}.txt")
-    # support.writeToFile(symbolTable, f"symbolTable_{fileName}.txt")
-    # support.writeToFile(tacDict, f"TAC_{fileName}.txt")
+    fileName = support.retrieveFileName(args.file)
+    support.writeToFile(tokenObj.tokenDict, f"tokens_{fileName}.txt")
+    support.writeToFile(AST.AbstractSyntaxTreeDictionary, f"absSyntaxTree_{fileName}.txt")
+    support.writeToFile(tac.tactDict, f"TAC_{fileName}.txt")
+    support.writeToFile(ST.SymbolTableDictionary, f"symbolTable_{fileName}.txt")
+    support.writeToFile(optimize.optimizedBlocks, f"optimizedPass_{fileName}.txt")
 
-    # # Check if the flags are set
-    # if args.lexer:
-    #     support.prettyPrintLex(tokens)
+    # Check if the flags are set
+    if args.lexer:
+        support.prettyPrintLex(tokenObj.tokenDict)
 
-    # if args.parse:
-    #     support.printAST(parser.abstractSyntaxTree)
-    #     support.printSymbolTable(symbolTable)
+    if args.parse:
+        support.printAST(AST.AbstractSyntaxTreeDictionary)
+        support.printSymbolTable(ST.SymbolTableDictionary)
 
-    # if args.tac:
-    #     support.printTAC(tacDict)
+    if args.tac:
+        support.printTAC(tac.tactDict)
         
-    # if args.opt1:
-    #     support.printTAC(tactDict)
+    if args.opt1 or args.opt2 or args.opt3:
+        support.printOptimizedPass(optimize.optimizedBlocks)
 
 if __name__ == "__main__":
     main()
