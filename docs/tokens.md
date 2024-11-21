@@ -11,3 +11,13 @@ The following keywords are supported:
 Supported punctuators include:
 
 - `( )`, `{ }`, `*`, `!=`, `*`,  `!=`, `+`, `-`, `*` , `/`, `!=`, `<`, `<=`, `:<`, `=`, `==`, `;`
+
+## 3. **Identifiers**
+Support for identifiers in variables, functions
+
+## 3. **Integers**
+Support for integers 
+
+## 4. **Floats**
+Support for floats
+
