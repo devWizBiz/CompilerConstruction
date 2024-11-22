@@ -57,6 +57,11 @@ def printOptimizedPass(input):
             for tac in tacList:
                 print(f"---- {tac}")
 
+def printASMList(input):
+    print("#########--- ASM LIST ---#########")
+    for item in input:
+        print(item)
+
 def writeToFile(input, fileName):
     with open(fileName, 'w') as file:
         file.write(str(input) + '\n')

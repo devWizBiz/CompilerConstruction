@@ -159,37 +159,38 @@ class Helper:
 class Parser:
     def __init__(self, tokens):
         self.ProgramHelp = Helper(tokens, 0)
+        self.SymbolTable = SymbolTable()
+        self.AbstractSyntaxTree = AbstractSyntaxTree()
+        
+        self.functionName = ""
+        self.functionType = ""
 
     """
         Parse Program
     """
     def parseProgram(self):
         programHelper = self.ProgramHelp
-        symbolTable = SymbolTable()
-        abstractSyntaxTree = AbstractSyntaxTree()
-        
+
         while programHelper.peekNextToken() is not None:
             tokens, tokenIndex = programHelper.Tokens, programHelper.TokenIndex
-            helper, allInfo = self.parseFunction(tokens, tokenIndex) # or self.parseGlobal
+            helper, allInfo = self.parseFunction(tokens, tokenIndex)
             
             if helper is None:
                 helper, allInfo = self.parseGlobal(tokens, tokenIndex)
-                symbolTable.addGlobal(allInfo[0], allInfo[1])
                 programHelper.updateIndex(helper.TokenIndex)
                 continue
                 
             if helper is not None: # Symbol Table and AbstractSyntaxTree gets Checked
                 type, id, allStatements = allInfo
-                symbolTable.addDeclarations(type, id, allStatements)
-                abstractSyntaxTree.addStatements(type, id, allStatements)
+                self.AbstractSyntaxTree.addStatements(type, id, allStatements)
                 # Update the program scopes indexes
                 programHelper.updateIndex(helper.TokenIndex)
             else:
                 token, type, line, column = programHelper.getToken().values()
                 support.error(f'Cannot match token found at LINE {line} COLUMN {column}: {token}')
-                sys.exist(1)
+                sys.exit(1)
         
-        return symbolTable, abstractSyntaxTree
+        return self.SymbolTable, self.AbstractSyntaxTree
 
     """
         Parse Function
@@ -205,11 +206,13 @@ class Parser:
         id = functionTokens[1]['TOKEN']
         
         if isFunctionValid:
+            self.functionName = id
+            self.functionType = type
+            self.SymbolTable.SymbolTableDictionary[id] = {'retType' : type, 'params' : None, 'vars' : {} }
             statementHelper, allStatements = self.parseStatements(tokens, functionHelper.TokenIndex)
             
             if allStatements:
                 allStatements = functionHelper.flattenList(allStatements)
-
                 # Update saved index
                 functionHelper.updateIndex(statementHelper.TokenIndex)
                 return functionHelper, (type, id, allStatements)
@@ -221,7 +224,7 @@ class Parser:
     """
     def parseGlobal(self, tokens, tokenIndex):
         globalHelper = Helper(tokens, tokenIndex)
-        helper, statement = self.parseDeclaration(tokens, globalHelper.TokenIndex)
+        helper, statement = self.parseDeclaration(tokens, globalHelper.TokenIndex, isGlobal=True)
 
         if helper:
             globalHelper.updateIndex(helper.TokenIndex)
@@ -236,7 +239,7 @@ class Parser:
         statementsHelper = Helper(tokens, tokenIndex)
         allStatements = []
         while statementsHelper.peekNextToken() != '}': # Closing brace of function
-            helper, statement = self.parseDeclaration(tokens, statementsHelper.TokenIndex) 
+            helper, statement = self.parseDeclaration(tokens, statementsHelper.TokenIndex, isGlobal=False) 
             
             if statement is None:
                 helper, statement = self.parseDeclarationAssignment(tokens, statementsHelper.TokenIndex)
@@ -265,7 +268,7 @@ class Parser:
     """
         Parse Declaration
     """
-    def parseDeclaration(self, tokens, tokenIndex):
+    def parseDeclaration(self, tokens, tokenIndex, isGlobal):
         declarationHelper = Helper(tokens, tokenIndex)
 
         declarationExpected = declarationHelper.getExpectedMatch('DECLARATION')
@@ -277,6 +280,10 @@ class Parser:
 
         if isDeclarationValid:
             declarationHelper.saveIndex(declarationHelper.TokenIndex)
+            if isGlobal:
+                self.SymbolTable.addGlobal(type, id)
+            else:
+                self.SymbolTable.addDeclaration(self.functionType, self.functionName, (type, id, None, None))
             return declarationHelper, (type, id, None, None)
             
         return None, None
@@ -300,6 +307,7 @@ class Parser:
 
             if expression is not None and decAssignmentHelper.peekNextToken() == ';':
                 decAssignmentHelper.getToken() # Consume ';'
+                self.SymbolTable.addDeclaration(self.functionType, self.functionName, (type, id, None, None))
                 return decAssignmentHelper, (type, id, '=', expression)
 
         return None, None
@@ -447,6 +455,7 @@ class Parser:
 
         # IDENTIFIER
         elif consumedToken['TYPE'] == 'IDENTIFIER':
+            self.SymbolTable.isDeclared(self.functionName, consumedToken['TOKEN'])
             return (consumedToken['TOKEN'])
 
         # - Value
@@ -471,13 +480,11 @@ class SymbolTable():
     """
     Add declarations to symbol Table within scope of function
     """
-    def addDeclarations(self, type, key, statements):
-        self.SymbolTableDictionary[key] = {'retType' : type, 'params' : None, 'vars' : {} }
-        
-        for type, id, statement, expression in statements:
-            if type in ['int', 'float']:
-                if self.existsInTableFunction(key, id) == False:
-                    self.SymbolTableDictionary[key]['vars'].update({id : type})
+    def addDeclaration(self, type, key, statement):
+        type, id, statement, expression = statement
+        if type in ['int', 'float']:
+            if self.existsInTableFunction(key, id) == False:
+                self.SymbolTableDictionary[key]['vars'].update({id : type})
     
     """
     Check for already declared variables within the global scope and function scope
@@ -485,7 +492,7 @@ class SymbolTable():
     def existsInTableFunction(self, key, id):
         if id in self.SymbolTableDictionary[key]['vars'] or id in self.SymbolTableDictionary['GLOBAL']:
             support.error(f'Already Declared {id}')
-            sys.exist(1)
+            sys.exit(1)
         return False
 
     """
@@ -494,10 +501,18 @@ class SymbolTable():
     def existsInTableGlobal(self, id):
         if id in self.SymbolTableDictionary['GLOBAL']:
             support.error(f'Already Declared {id}')
-            sys.exist(1)
-        
+            sys.exit(1)
         return False
 
+    """
+        Make sure all variables are declared when being used
+    """
+    def isDeclared(self, key, id):
+        if id in self.SymbolTableDictionary[key]['vars'] or id in self.SymbolTableDictionary['GLOBAL']:
+            return True
+        else:
+            support.error(f'Not Declared {id}')
+            sys.exit(1)
         
 class AbstractSyntaxTree():
     def __init__(self):

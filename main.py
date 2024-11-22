@@ -7,6 +7,7 @@ from lexer import Tokenizer
 from parser import Parser
 from tac import TAC
 from optimizer import Optimizer
+from assemblyGeneration import asmGenerator
 
 """
 Main function that processes a given C source file and optionally runs a lexer.
@@ -28,6 +29,7 @@ def main():
     argParser.add_argument('-O1', '--opt1', action='store_true', help='Constant Propagation optimization (last used optimization will be shown)')
     argParser.add_argument('-O2', '--opt2', action='store_true', help='Constant Folding optimization (last used optimization will be shown)')
     argParser.add_argument('-O3', '--opt3', action='store_true', help='Dead Code Elimination optimization (last used optimization will be shown)')
+    argParser.add_argument('-A', '--asm', action='store_true', help='Assemble Generation')
     argParser.add_argument('file', help='Given C source file')
 
     # Parse the arguments
@@ -53,8 +55,14 @@ def main():
     tac = TAC()
     tac.generateTAC(AST.AbstractSyntaxTreeDictionary, ST.SymbolTableDictionary)
 
+    # Create optimization pass
     optimizations = [args.opt1, args.opt2, args.opt3 ]
-    optimize = Optimizer(tac.basicBlockDict, ST.SymbolTableDictionary, optimizations)
+    if(optimizations):
+        optimize = Optimizer(tac.basicBlockDict, ST.SymbolTableDictionary, optimizations)
+        tac.basicBlockDict = optimize.basicBlocks
+    
+    # Create Assembly
+    asm = asmGenerator(tac.basicBlockDict, ST.SymbolTableDictionary, tokenObj.tokenDict)
 
     fileName = support.retrieveFileName(args.file)
     support.writeToFile(tokenObj.tokenDict, f"tokens_{fileName}.txt")
@@ -62,6 +70,7 @@ def main():
     support.writeToFile(tac.tactDict, f"TAC_{fileName}.txt")
     support.writeToFile(ST.SymbolTableDictionary, f"symbolTable_{fileName}.txt")
     support.writeToFile(optimize.optimizedBlocks, f"optimizedPass_{fileName}.txt")
+    support.writeToFile(asm.asmList, f"asmList_{fileName}.txt")
 
     # Check if the flags are set
     if args.lexer:
@@ -76,6 +85,9 @@ def main():
         
     if args.opt1 or args.opt2 or args.opt3:
         support.printOptimizedPass(optimize.optimizedBlocks)
+        
+    if args.asm:
+        support.printASMList(asm.asmList)
 
 if __name__ == "__main__":
     main()
