@@ -53,18 +53,62 @@ def printOptimizedPass(input):
     print("#########--- Optimized Pass Three Address Code ---#########")
     for key in input:
         print(f"-- {key}")
-        for name, basicBlockNumber, tacList in input[key]:
-            for tac in tacList:
-                print(f"---- {tac}")
+        for tac in input[key]:
+            print(f"---- {tac}")
 
 def printASMList(input):
     print("#########--- ASM LIST ---#########")
-    for item in input:
-        print(item)
+    for function, ASM in input:
+        print(f'{function}:')
+        for instr in ASM:
+            print(f'{instr}')
 
-def writeToFile(input, fileName):
+def writeToFile(input, fileName, type):
     with open(fileName, 'w') as file:
-        file.write(str(input) + '\n')
+        if type == "token":
+            file.write("#########--- Tokens ---#########\n")
+            for token in input:
+                file.write(f'{input[token]}\n')
+        elif type == "abs":
+            file.write("#########--- Abstract Syntax Tree ---#########\n")
+            for key in input:
+                file.write(f"-- {key}\n")
+                for statements in input[key]:
+                    file.write(f"---- {statements}\n")
+                    for statement in input[key]['statements']:
+                        file.write(f"------ {statement}\n")
+        elif type == "tac":
+            file.write("#########--- Three Address Code ---#########\n")
+            for key in input:
+                file.write(f"-- {key}\n")
+                for statement in input[key]:
+                    file.write(f"---- {statement}\n")
+        elif type == "st":
+            file.write("#########--- Symbol Table ---#########\n")
+            listOfKeys = list(input.keys())
+            for key in listOfKeys:
+                file.write(f"--- {key} ---\n")
+                listOfSubKeys = list(input[key].keys())
+                for subKey in listOfSubKeys:
+                    if subKey != 'vars':
+                        file.write(f"-- {subKey} : {input[key][subKey]}\n")
+                    else:
+                        file.write(f"-- vars:\n")
+                        varKeys = list(input[key][subKey])
+                        for var in varKeys:
+                            file.write(f"--- {var} : {input[key][subKey][var]}\n")
+        elif type == "op":
+            file.write("#########--- Optimized Pass Three Address Code ---#########\n")
+            for key in input:
+                file.write(f"-- {key}\n")
+                for tac in input[key]:
+                    file.write(f"---- {tac}\n")
+        else:
+            file.write("#########--- ASM LIST ---#########\n")
+            for function, ASM in input:
+                file.write(f'{function}:\n')
+                for instr in ASM:
+                    file.write(f'{instr}\n')
         
 def checkExtensions(filePath):
     if filePath.endswith('.c'):

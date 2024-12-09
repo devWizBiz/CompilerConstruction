@@ -11,6 +11,7 @@ float testReturnFloatFunction(){
 int calculateSumOfInts(){
     int a = 10;
     int b = 2;
+    int c = 4;
     int sum;
     sum = a + b;
     return sum;
@@ -71,6 +72,7 @@ int main(){
     int a = 2;
     int b = 10;
     int p = 3 + 4 * tmp + (b/a);
+    a = 3 + 7;
 
     int k;
     k = 1;
